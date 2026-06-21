@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .log-box { background: #1e293b; color: #00ff00; font-family: monospace; height: 400px; overflow-y: auto; padding: 1rem; border-radius: 6px; font-size: 0.85rem; }
+        .step-card { border-left: 4px solid #0d6efd; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="#">🤖 AI Orchestrator</a>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item"><a class="nav-link active" href="index.html">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="knowledge.html">Knowledge Base</a></li>
+                    <li class="nav-item"><a class="nav-link" href="search.html">Search Engine</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h4 class="card-title mb-3">🚀 Task Commander</h4>
+                <div class="input-group input-group-lg">
+                    <input type="text" id="taskInput" class="form-control" placeholder="Enter a task (e.g., 'Q4 Release Compliance Review')...">
+                    <button class="btn btn-primary" type="button" id="submitBtn" onclick="submitTask()">Execute Plan</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white fw-bold">📋 Execution Plan</div>
+                    <div class="card-body" id="planContainer">
+                        <p class="text-muted text-center mt-5">Waiting for task input...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white fw-bold">⚙️ Worker Logs</div>
+                    <div class="card-body p-0">
+                        <div id="consoleOutput" class="log-box">[SYSTEM] Ready for operations...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function submitTask() {
+            const input = document.getElementById('taskInput');
+            const btn = document.getElementById('submitBtn');
+            const consoleBox = document.getElementById('consoleOutput');
+            const planBox = document.getElementById('planContainer');
+
+            if (!input.value.trim()) return;
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing...';
+            consoleBox.innerText += `\n> Sending task: "${input.value}"...\n`;
+            
+            try {
+                const response = await fetch('http://localhost:8000/decompose', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task: input.value })
+                });
+                const data = await response.json();
+
+                // Render Plan with Bootstrap Cards
+                let stepsHtml = '';
+                if(data.plan && data.plan.steps) {
+                    data.plan.steps.forEach(step => {
+                        stepsHtml += `
+                            <div class="card step-card">
+                                <div class="card-body py-2">
+                                    <h6 class="card-title text-primary">Step ${step.step_number}: ${step.name || 'Action'}</h6>
+                                    <p class="card-text small text-secondary mb-0">${step.description}</p>
+                                    <small class="text-muted">Resource: ${step.assigned_resource_id || 'Worker'}</small>
+                                </div>
+                            </div>`;
+                    });
+                    planBox.innerHTML = `<h5 class="mb-3">${data.plan.plan_overview}</h5>${stepsHtml}`;
+                }
+
+                consoleBox.innerText += `> Status: ${data.execution_status}\n`;
+                if(data.meta.source === 'ai_generated') {
+                    consoleBox.innerText += `> Source: AI Generation (New Plan)\n`;
+                } else {
+                    consoleBox.innerText += `> Source: Task Library (Predefined)\n`;
+                }
+
+            } catch (err) {
+                consoleBox.innerText += `[ERROR] ${err.message}\n`;
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Execute Plan";
+            }
+        }
+    </script>
+</body>
+</html>

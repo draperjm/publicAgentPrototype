@@ -1,0 +1,17 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies for build
+RUN apt-get update && apt-get install -y build-essential
+
+# Install Python Libraries
+# chromadb-client: lightweight client
+# pypdf: for reading PDFs
+# sentence-transformers: for local embeddings
+# Increased timeout to 1000s (default is 15s)
+RUN pip install --no-cache-dir --timeout=1000 chromadb pypdf sentence-transformers
+
+COPY ingest.py .
+
+CMD ["python", "ingest.py"]

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semantic Search</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .ai-answer-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 20px; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        .source-card { font-size: 0.85rem; background: #fff; border: 1px solid #e2e8f0; }
+    </style>
+</head>
+<body class="bg-light">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="#">🤖 AI Orchestrator</a>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="knowledge.html">Knowledge Base</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="search.html">Search Engine</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container" style="max-width: 900px;">
+        <div class="text-center py-4">
+            <h1 class="display-6 fw-bold text-primary">Neural Search</h1>
+            <p class="text-muted">RAG-Powered: Retrieves facts and generates answers.</p>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-4">
+                <div class="row g-2">
+                    <div class="col-md-3">
+                        <select id="tagFilter" class="form-select form-select-lg">
+                            <option value="all">All Tags</option>
+                        </select>
+                    </div>
+                    <div class="col-md-7">
+                        <input type="text" id="searchInput" class="form-control form-select-lg" placeholder="Ask a question (e.g. 'Summarize the financial risks')...">
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button class="btn btn-primary btn-lg" onclick="searchKnowledge()">Ask AI</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="resultsContainer" style="display:none;">
+            
+            <h5 class="mb-3">💡 Generated Answer</h5>
+            <div id="aiAnswer" class="ai-answer-box">
+                </div>
+
+            <h5 class="mb-3 text-muted">📚 Reference Sources</h5>
+            <div id="sourceList" class="row">
+                </div>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', populateTags);
+
+        async function populateTags() {
+            // (Same tag logic as before)
+            const select = document.getElementById('tagFilter');
+            try {
+                const res = await fetch('http://localhost:8000/knowledge/files');
+                const data = await res.json();
+                if (data.files) {
+                    const tags = new Set();
+                    data.files.forEach(f => { if(f.tag) tags.add(f.tag); });
+                    tags.forEach(tag => {
+                        const opt = document.createElement('option');
+                        opt.value = tag;
+                        opt.text = tag.charAt(0).toUpperCase() + tag.slice(1);
+                        select.appendChild(opt);
+                    });
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        async function searchKnowledge() {
+            const query = document.getElementById('searchInput').value;
+            const tag = document.getElementById('tagFilter').value;
+            const container = document.getElementById('resultsContainer');
+            const answerBox = document.getElementById('aiAnswer');
+            const sourceBox = document.getElementById('sourceList');
+            
+            if(!query) return;
+            
+            // Show Loading State
+            container.style.display = 'block';
+            answerBox.innerHTML = '<div class="text-center"><div class="spinner-border text-success" role="status"></div><p class="mt-2">Reading documents & synthesizing answer...</p></div>';
+            sourceBox.innerHTML = '';
+
+            try {
+                const response = await fetch('http://localhost:8000/knowledge/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query, tag: tag })
+                });
+                const data = await response.json();
+                
+                // 1. Render AI Answer (HTML)
+                answerBox.innerHTML = data.answer;
+
+                // 2. Render Sources
+                if(data.results.length > 0) {
+                    let html = '';
+                    data.results.forEach(hit => {
+                        html += `
+                            <div class="col-md-4 mb-3">
+                                <div class="card source-card h-100 p-3">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="badge bg-light text-dark border">${hit.tag}</span>
+                                        <small class="text-muted">Page ${hit.page + 1}</small>
+                                    </div>
+                                    <p class="mb-1 fw-bold text-truncate">${hit.source}</p>
+                                    <p class="text-muted small" style="font-size: 0.8rem;">"${hit.content}"</p>
+                                </div>
+                            </div>`;
+                    });
+                    sourceBox.innerHTML = html;
+                } else {
+                    sourceBox.innerHTML = '<p class="text-muted">No sources cited.</p>';
+                }
+
+            } catch (e) {
+                answerBox.innerHTML = '<p class="text-danger">Error: Orchestrator unreachable.</p>';
+            }
+        }
+    </script>
+</body>
+</html>

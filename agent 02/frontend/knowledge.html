@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Base</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="#">🤖 AI Orchestrator</a>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="knowledge.html">Knowledge Base</a></li>
+                    <li class="nav-item"><a class="nav-link" href="search.html">Search Engine</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3>📚 Ingested Documents</h3>
+            <button class="btn btn-outline-primary" onclick="fetchFiles()">🔄 Refresh List</button>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <div id="fileListContainer" class="list-group list-group-flush">
+                    <div class="p-4 text-center text-muted">Loading files...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="alert alert-info mt-3">
+            <strong>Tip:</strong> To add files, drop PDFs into <code>agent 01/knowledge/documents/</code> folder.
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', fetchFiles);
+
+        async function fetchFiles() {
+            const container = document.getElementById('fileListContainer');
+            try {
+                const res = await fetch('http://localhost:8000/knowledge/files');
+                const data = await res.json();
+                
+                if (data.files && data.files.length > 0) {
+                    let html = '';
+                    data.files.forEach(file => {
+                        // Badge color logic
+                        let badgeClass = 'bg-secondary';
+                        if (file.tag === 'finance') badgeClass = 'bg-success';
+                        if (file.tag === 'research') badgeClass = 'bg-info text-dark';
+
+                        html += `
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    <span class="fs-4 me-3">📄</span>
+                                    <div>
+                                        <h6 class="mb-0">${file.name}</h6>
+                                        <span class="badge ${badgeClass} rounded-pill">${file.tag.toUpperCase()}</span>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteFile('${file.name}')">Delete</button>
+                            </div>`;
+                    });
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<div class="p-4 text-center text-muted">No documents found in Vector Store.</div>';
+                }
+            } catch (err) {
+                container.innerHTML = '<div class="p-4 text-center text-danger">Error connecting to Orchestrator.</div>';
+            }
+        }
+
+        async function deleteFile(filename) {
+            if(!confirm(`Delete "${filename}" from memory?`)) return;
+            try {
+                const response = await fetch('http://localhost:8000/knowledge/files', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename: filename })
+                });
+                const data = await response.json();
+                if (data.status === 'success') fetchFiles();
+                else alert("Failed to delete.");
+            } catch (err) { alert(err.message); }
+        }
+    </script>
+</body>
+</html>

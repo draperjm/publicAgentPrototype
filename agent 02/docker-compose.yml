@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # 1. The Brain (Orchestrator)
+  orchestrator:
+    build: .
+    container_name: agent-orchestrator
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+    env_file:
+      - .env
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    networks:
+      - agent-network
+    depends_on:
+      - vectordb
+
+  # 2. The Muscle (Worker)
+  worker:
+    build: 
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: agent-worker
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./:/app
+    networks:
+      - agent-network
+
+  # 3. The Face (Frontend)
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    container_name: agent-frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+    networks:
+      - agent-network
+
+  # 4. The Memory (Vector Database)
+  vectordb:
+    image: chromadb/chroma:latest
+    container_name: agent-vectordb
+    ports:
+      - "8002:8000" # Maps internal 8000 to host 8002
+    volumes:
+      - ./chroma_data:/chroma/chroma # Persist data to disk
+    networks:
+      - agent-network
+
+  # 5. The Librarian (Knowledge Ingestion Agent)
+  knowledge-agent:
+    build:
+      context: ./knowledge
+      dockerfile: Dockerfile.knowledge
+    container_name: agent-knowledge
+    volumes:
+      - ./knowledge/documents:/app/documents
+    environment:
+      - CHROMA_HOST=agent-vectordb
+      - CHROMA_PORT=8000
+    networks:
+      - agent-network
+    depends_on:
+      - vectordb
+
+networks:
+  agent-network:
+    driver: bridge
