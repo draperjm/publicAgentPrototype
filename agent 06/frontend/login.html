@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In — AI Agent Workflow</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%22 height=%2232%22 rx=%226%22 fill=%22%23161616%22/%3E%3Crect x=%228%22 y=%2210%22 width=%2216%22 height=%2212%22 rx=%223%22 fill=%22none%22 stroke=%22%234d9fff%22 stroke-width=%222%22/%3E%3Ccircle cx=%2212%22 cy=%2216%22 r=%221.5%22 fill=%22%234d9fff%22/%3E%3Ccircle cx=%2220%22 cy=%2216%22 r=%221.5%22 fill=%22%234d9fff%22/%3E%3Crect x=%2214%22 y=%227%22 width=%224%22 height=%223%22 rx=%221%22 fill=%22%234d9fff%22/%3E%3C/svg%3E">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #161616;
+            color: #d4d4d4;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-image: radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px);
+            background-size: 22px 22px;
+        }
+        .card {
+            background: #1e1e1e;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 14px;
+            padding: 48px 40px 36px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 32px 80px rgba(0,0,0,0.55);
+        }
+        .app-icon {
+            width: 58px; height: 58px;
+            background: linear-gradient(135deg, #1d4ed8, #4d9fff);
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.7rem;
+            margin: 0 auto 20px;
+        }
+        h1 { font-size: 1.35rem; font-weight: 700; color: rgba(255,255,255,0.92); margin-bottom: 7px; }
+        h1 span { color: #4d9fff; }
+        .subtitle { font-size: 0.81rem; color: #5a5a6a; line-height: 1.55; margin-bottom: 32px; }
+        .divider { border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 0 0 28px; }
+
+        /* Google button container */
+        #signin-btn { display: flex; justify-content: center; min-height: 44px; }
+
+        /* Config error */
+        .cfg-error {
+            background: rgba(239,68,68,0.1);
+            border: 1px solid rgba(239,68,68,0.3);
+            border-radius: 8px;
+            padding: 14px 16px;
+            font-size: 0.79rem;
+            color: #fca5a5;
+            text-align: left;
+            line-height: 1.55;
+        }
+        .cfg-error code {
+            background: rgba(255,255,255,0.07);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            color: #f87171;
+        }
+
+        /* User preview after sign-in */
+        .user-preview {
+            display: none;
+            align-items: center;
+            gap: 12px;
+            background: rgba(34,197,94,0.08);
+            border: 1px solid rgba(34,197,94,0.22);
+            border-radius: 8px;
+            padding: 12px 16px;
+            text-align: left;
+        }
+        .user-preview.show { display: flex; }
+        .u-avatar { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+        .u-name { font-size: 0.84rem; font-weight: 600; color: #4ade80; }
+        .u-email { font-size: 0.72rem; color: #555; margin-top: 1px; }
+        .redirecting { font-size: 0.74rem; color: #555; margin-top: 10px; }
+
+        .footer { margin-top: 28px; font-size: 0.7rem; color: #3a3a4a; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="app-icon">&#11041;</div>
+    <h1>AI Agent <span>Workflow</span></h1>
+    <p class="subtitle">Multi-agent validation platform.<br>Sign in with your Google account to continue.</p>
+    <hr class="divider">
+
+    <div id="signin-btn"></div>
+
+    <div class="user-preview" id="userPreview">
+        <img class="u-avatar" id="uAvatar" src="" alt="">
+        <div>
+            <div class="u-name" id="uName"></div>
+            <div class="u-email" id="uEmail"></div>
+        </div>
+    </div>
+    <p class="redirecting" id="redirectMsg"></p>
+
+    <p class="footer">Griffith University &middot; PhD Research Platform</p>
+</div>
+
+<script>
+// ── Configuration ─────────────────────────────────────────────────────
+// Replace this value with your Google OAuth 2.0 Client ID.
+// Get one at: https://console.cloud.google.com/apis/credentials
+// Authorised JavaScript origins must include: http://localhost:8080 (local) and your Azure URL.
+const GOOGLE_CLIENT_ID = '995665194156-tar51qsf70sso15dv5i6emjpm69o97cr.apps.googleusercontent.com';
+// ─────────────────────────────────────────────────────────────────────
+
+function parseJwt(token) {
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(decodeURIComponent(escape(atob(b64))));
+}
+
+function handleCredentialResponse(response) {
+    try {
+        const p = parseJwt(response.credential);
+        document.getElementById('uAvatar').src = p.picture || '';
+        document.getElementById('uName').textContent   = p.name  || '';
+        document.getElementById('uEmail').textContent  = p.email || '';
+        document.getElementById('userPreview').classList.add('show');
+        document.getElementById('redirectMsg').textContent = 'Signed in — redirecting…';
+
+        sessionStorage.setItem('agent_auth', JSON.stringify({
+            credential: response.credential,
+            name:    p.name,
+            email:   p.email,
+            picture: p.picture,
+            exp:     p.exp
+        }));
+
+        setTimeout(() => window.location.replace('/'), 900);
+    } catch(e) {
+        console.error('Sign-in error', e);
+    }
+}
+
+(function init() {
+    // Already authenticated — skip login page
+    try {
+        const stored = JSON.parse(sessionStorage.getItem('agent_auth') || 'null');
+        if (stored && stored.exp && Date.now() / 1000 < stored.exp) {
+            window.location.replace('/');
+            return;
+        }
+    } catch(e) {}
+    sessionStorage.removeItem('agent_auth');
+
+    // Validate Client ID is configured
+    if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith('REPLACE_')) {
+        document.getElementById('signin-btn').innerHTML =
+            '<div class="cfg-error">' +
+            '<strong>Configuration required</strong><br><br>' +
+            'Open <code>login.html</code> and set <code>GOOGLE_CLIENT_ID</code> ' +
+            'to your OAuth 2.0 Client ID from ' +
+            '<a href="https://console.cloud.google.com/apis/credentials" ' +
+            'target="_blank" style="color:#93c5fd;">Google Cloud Console</a>.<br><br>' +
+            'Authorised JavaScript origins to add:<br>' +
+            '<code>http://localhost:8080</code>' +
+            '</div>';
+        return;
+    }
+
+    // Wait for GSI library then initialise
+    function tryInit() {
+        if (typeof google === 'undefined' || !google.accounts) {
+            setTimeout(tryInit, 100);
+            return;
+        }
+        google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback:  handleCredentialResponse,
+            auto_select: false,
+            use_fedcm_for_prompt: true
+        });
+        google.accounts.id.renderButton(
+            document.getElementById('signin-btn'),
+            { theme: 'filled_black', size: 'large', shape: 'rectangular',
+              text: 'sign_in_with', logo_alignment: 'left', width: 320 }
+        );
+    }
+    tryInit();
+})();
+</script>
+</body>
+</html>

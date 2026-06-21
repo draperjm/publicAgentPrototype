@@ -1,0 +1,279 @@
+{
+  "registry_version": "1.0",
+  "last_updated": "2026-03-08T00:00:00Z",
+
+  "agents": [
+    {
+      "id": "agent-document-extractor",
+      "name": "Document Extraction Agent",
+      "type": "specialist",
+      "description": "Receives a list of files (with processing metadata from the document review and planning steps) and a process step definition. Extracts content from each file using the appropriate tool (pdfplumber for text PDFs), splits the document into sections, tags each section for relevance to the process step using an LLM, and produces a structured extraction JSON per file with tagged sections and a step-specific structured output.",
+      "capabilities": [
+        "Extract text, tables, and section structure from PDF and plain-text files",
+        "Tag document sections for relevance to a given process step using LLM",
+        "Produce per-file extraction JSON with section-level content tags and relevance scores",
+        "Generate structured step extraction grouped by content category (e.g. HV, LV, funding)",
+        "Save per-file and consolidated extraction reports to the OUTPUT directory"
+      ],
+      "meta_data": {
+        "response_time": "medium-high (10-60s per file depending on page count)",
+        "cost_tier": "medium (gpt-4o-mini: one call per section for tagging + one call per file for structured extraction)",
+        "reliability": "high"
+      },
+      "endpoint": {
+        "type": "http",
+        "url": "http://document-extractor:8090/extract"
+      },
+      "input_schema": {
+        "required": ["files", "process_step"],
+        "optional": ["documents_folder"]
+      }
+    },
+    {
+      "id": "agent-document-reviewer",
+      "name": "Document Reviewer Agent",
+      "type": "specialist",
+      "description": "Scans a folder of documents against a search context. Uses an LLM tool to assess each filename for relevance, then reads and analyses each file's content to confirm a match. Returns a ranked JSON result with filename match, content match, matched document type, and a weighted confidence score.",
+      "capabilities": [
+        "Assess filenames against a search context using LLM",
+        "Extract text from PDF, DOCX, TXT, CSV, JSON, and Markdown files",
+        "Analyse file contents against a search context using LLM",
+        "Return ranked results with confidence scores"
+      ],
+      "meta_data": {
+        "response_time": "medium (5-30s depending on folder size)",
+        "cost_tier": "low (gpt-4o-mini)",
+        "reliability": "high"
+      },
+      "endpoint": {
+        "type": "http",
+        "url": "http://document-reviewer:8089/review"
+      },
+      "input_schema": {
+        "required": ["folder_path", "search_context"]
+      },
+      "tools_used": [
+        "check_filename_match",
+        "read_file_content",
+        "analyse_content_match"
+      ]
+    }
+  ],
+
+  "tools": [
+    {
+      "id": "tool-list-folder-files",
+      "name": "Folder File Lister",
+      "description": "Returns a list of all file names in a specified folder path. Optionally filters by file extension. Returns file name, extension, size in bytes, and last modified timestamp for each file.",
+      "use_case": "Use at the start of any document review workflow to enumerate what files are present in a folder before deciding which ones to read or analyse.",
+      "endpoint": {
+        "type": "internal",
+        "function_name": "list_folder_files"
+      },
+      "input_schema": {
+        "required": ["folder_path"],
+        "optional": ["extensions"]
+      },
+      "output_schema": {
+        "files": [
+          {
+            "filename": "string",
+            "extension": "string",
+            "size_bytes": "integer",
+            "last_modified": "ISO8601 datetime string"
+          }
+        ],
+        "total_count": "integer",
+        "folder_path": "string"
+      }
+    },
+    {
+      "id": "tool-check-filename-match",
+      "name": "Filename Match Checker",
+      "description": "Uses an LLM to assess whether a filename suggests it matches a given search context. Returns match flag, inferred document type, confidence score, and reasoning.",
+      "use_case": "Use when you need a quick relevance signal from a filename before reading the full file.",
+      "endpoint": {
+        "type": "internal",
+        "function_name": "check_filename_match"
+      }
+    },
+    {
+      "id": "tool-read-file-content",
+      "name": "File Content Reader",
+      "description": "Extracts text from a file. Supports PDF (pdfplumber, first 6 pages), DOCX, and plain text formats. Returns up to 4000 characters of extracted content.",
+      "use_case": "Use to extract readable text from a document before passing it to a content analysis LLM call.",
+      "endpoint": {
+        "type": "internal",
+        "function_name": "read_file_content"
+      }
+    },
+    {
+      "id": "tool-analyse-content-match",
+      "name": "Content Match Analyser",
+      "description": "Uses an LLM to assess whether a file's extracted content matches a given search context. Returns match flag, document type, confidence score, and reasoning.",
+      "use_case": "Use after reading file content to confirm whether a document is the one being searched for.",
+      "endpoint": {
+        "type": "internal",
+        "function_name": "analyse_content_match"
+      }
+    },
+    {
+      "id": "tool-extract-pdf-content",
+      "name": "PDF Content Extractor",
+      "description": "Extracts structured content from a PDF file including text, tables, and images. Automatically detects document sections from heading and numbering patterns. For each section returns: section_number, section_name, page_number, full text content, extracted tables (as headers + rows), and image descriptions generated by a vision LLM. Also produces an LLM-generated summary per section.",
+      "use_case": "Use when a document has been identified as a text-based PDF (recommended_reader: pdfplumber) and deep extraction of its sections, tables, and figures is required. Handles multi-level numbered headings (1.2.3), all-caps headings, and mixed-content pages.",
+      "endpoint": {
+        "type": "internal",
+        "function_name": "extract_pdf_content"
+      },
+      "input_schema": {
+        "required": ["filepath"],
+        "optional": ["max_pages"]
+      },
+      "output_schema": {
+        "filepath": "string",
+        "filename": "string",
+        "total_pages": "integer",
+        "pages_processed": "integer",
+        "total_sections": "integer",
+        "sections": [
+          {
+            "section_number": "string or null",
+            "section_name": "string",
+            "page_number": "integer",
+            "contents": {
+              "text": "string",
+              "tables": [
+                {
+                  "table_number": "integer",
+                  "headers": ["string"],
+                  "rows": [["string"]]
+                }
+              ],
+              "images": [
+                {
+                  "page_number": "integer",
+                  "description": "string"
+                }
+              ]
+            },
+            "summary": "string"
+          }
+        ]
+      },
+      "dependencies": {
+        "python_packages": ["pdfplumber", "Pillow", "openai"],
+        "llm_calls": {
+          "text_summary": "one call per section (gpt-4o-mini)",
+          "image_description": "one call per page with embedded images (gpt-4o vision)"
+        }
+      }
+    },
+    {
+      "id": "tool-plan-document-processing",
+      "name": "Document Processing Planner",
+      "description": "Reads the Step 1 document review output file and the tool registry. For each identified document, uses an LLM to determine the best processing tool, whether format conversion is required (e.g. image-based PDF to PNG for OCR), and the extraction method. Saves a structured processing plan to the OUTPUT directory.",
+      "use_case": "Use after document review (Step 1) to plan how each document will be processed in subsequent steps — particularly to handle mixed content types (text vs scanned image PDFs).",
+      "endpoint": {
+        "type": "http",
+        "url": "http://document-reviewer:8089/plan_processing"
+      },
+      "input_schema": {
+        "required": ["step1_output_file"]
+      },
+      "output_schema": {
+        "processing_plan": [
+          {
+            "filename": "string",
+            "document_type": "string",
+            "content_type": "text | image | unsupported | error",
+            "text_quality": "high | low | none",
+            "recommended_reader": "string",
+            "processing_tool_id": "string",
+            "conversion_required": "boolean",
+            "conversion_type": "string or null",
+            "extraction_method": "string",
+            "processing_notes": "string"
+          }
+        ],
+        "total_documents": "integer",
+        "output_file": "string"
+      }
+    },
+    {
+      "id": "tool-extract-document-data",
+      "name": "Document Data Extractor",
+      "description": "Extracts structured, tagged content from a list of documents according to a process step definition. Splits each document into sections, scores each section's relevance to the process step (0.0–1.0), applies content tags drawn from the step context (e.g. 'hv', 'lv', 'earthing', 'funding'), and generates a step-specific structured extraction grouping all relevant content by category. Saves per-file extraction JSON and a consolidated ExtractionReport to the OUTPUT directory.",
+      "use_case": "Use after document review (Step 1) and processing plan (Step 2) to extract the specific data required by a process step — for example, extracting all supply requirements or funding determination items from a design brief.",
+      "endpoint": {
+        "type": "http",
+        "url": "http://document-extractor:8090/extract"
+      },
+      "input_schema": {
+        "required": ["files", "process_step"],
+        "optional": ["documents_folder"],
+        "files_item": {
+          "filename": "string",
+          "filepath": "string or null (resolved from documents_folder if omitted)",
+          "processing_tool_id": "string (e.g. tool-extract-pdf-content)",
+          "document_type": "string or null",
+          "content_type": "text | image | unsupported | error",
+          "text_quality": "high | low | none"
+        },
+        "process_step_item": {
+          "step_id": "string or null",
+          "step_name": "string",
+          "summary": "string or null",
+          "details": "string or null",
+          "expected_output": "object or null (optional schema for structured extraction)"
+        }
+      },
+      "output_schema": {
+        "process_step": "object (echo of input process step)",
+        "documents_folder": "string",
+        "total_files": "integer",
+        "timestamp": "string (YYYYMMdd_HHmmss)",
+        "output_file": "string (path to ExtractionReport_*.json)",
+        "extractions": [
+          {
+            "filename": "string",
+            "filepath": "string",
+            "document_type": "string or null",
+            "process_step_name": "string",
+            "total_sections": "integer",
+            "relevant_sections": "integer (sections with relevance_score >= 0.4)",
+            "output_file": "string (path to per-file Extraction_*.json)",
+            "extracted_sections": [
+              {
+                "section_number": "string or null",
+                "section_name": "string",
+                "page_number": "integer",
+                "text": "string",
+                "tables": [{"headers": ["string"], "rows": [["string"]]}],
+                "images": [],
+                "relevance_score": "float 0.0–1.0",
+                "relevance_reason": "string",
+                "content_tags": ["string"]
+              }
+            ],
+            "step_extraction": {
+              "note": "Structured data grouped by content category (varies by process step)",
+              "example_keys": ["hv", "lv", "earthing", "funding_items", "substation"]
+            }
+          }
+        ]
+      },
+      "dependencies": {
+        "python_packages": ["pdfplumber", "Pillow", "openai"],
+        "llm_calls": {
+          "section_tagging": "one call per section per file (gpt-4o-mini)",
+          "structured_extraction": "one call per file (gpt-4o-mini)"
+        }
+      }
+    }
+  ],
+
+  "operations": [],
+
+  "knowledge": []
+}

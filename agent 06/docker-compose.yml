@@ -1,0 +1,152 @@
+services:
+  # Responder Service (task decomposition + orchestrator handoff)
+  responder:
+    build:
+      context: .
+      dockerfile: Dockerfile.responder
+    container_name: agent06-responder
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ORCHESTRATOR_URL=http://orchestrator:8001/execute
+    volumes:
+      - .:/app
+    depends_on:
+      - orchestrator
+    networks:
+      - agent-network
+
+  # Orchestrator Service
+  orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.orchestrator
+    container_name: agent06-orchestrator
+    ports:
+      - "8001:8001"
+    environment:
+      - CHUNKER_URL=http://document-chunker:8091/chunk
+      - ANALYTICS_URL=http://data-analytics:8092/analyse
+    volumes:
+      - .:/app
+      - ./documents:/documents
+      - chunk_output:/output/chunks
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - document-chunker
+      - data-analytics
+    networks:
+      - agent-network
+
+  # Document Reviewer Agent
+  document-reviewer:
+    build:
+      context: .
+      dockerfile: Dockerfile.document_reviewer
+    container_name: agent06-document-reviewer
+    ports:
+      - "8089:8089"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o}
+    volumes:
+      - .:/app
+      - ./documents:/documents
+    networks:
+      - agent-network
+
+  # Document Extractor Agent
+  document-extractor:
+    build:
+      context: .
+      dockerfile: Dockerfile.document_extractor
+    container_name: agent06-document-extractor
+    ports:
+      - "8090:8090"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o}
+      - TAGGING_MODEL=${TAGGING_MODEL:-gpt-4o-mini}
+      - VISION_MODEL=${VISION_MODEL:-gemini-2.0-flash}
+      - ASSET_EXTRACTION_MODEL=${ASSET_EXTRACTION_MODEL:-claude-sonnet-4-6}
+    volumes:
+      - .:/app
+      - ./documents:/documents
+      - chunk_output:/output/chunks
+    networks:
+      - agent-network
+
+  # Step Validator Agent
+  step-validator:
+    build:
+      context: .
+      dockerfile: Dockerfile.step_validator
+    container_name: agent06-step-validator
+    ports:
+      - "8088:8088"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
+      - VALIDATOR_MODEL=${VALIDATOR_MODEL:-gpt-4o}
+    volumes:
+      - .:/app
+    networks:
+      - agent-network
+
+  # Data Analytics Agent
+  data-analytics:
+    build:
+      context: .
+      dockerfile: Dockerfile.data_analytics
+    container_name: agent06-data-analytics
+    ports:
+      - "8092:8092"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANALYTICS_MODEL=${ANALYTICS_MODEL:-gpt-4o}
+    volumes:
+      - .:/app
+    networks:
+      - agent-network
+
+  # Document Chunker — renders PDF pages/regions to PNG chunks
+  document-chunker:
+    build:
+      context: .
+      dockerfile: Dockerfile.document_chunker
+    container_name: agent06-document-chunker
+    ports:
+      - "8091:8091"
+    volumes:
+      - .:/app
+      - ./documents:/documents
+      - chunk_output:/output/chunks
+    networks:
+      - agent-network
+
+  # Frontend Service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    container_name: agent06-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - responder
+      - orchestrator
+      - data-analytics
+    networks:
+      - agent-network
+
+networks:
+  agent-network:
+    driver: bridge
+
+volumes:
+  chunk_output:
