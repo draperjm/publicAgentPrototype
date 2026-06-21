@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Variance Report Viewer</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%22 height=%2732%22 rx=%226%22 fill=%22%23161616%22/%3E%3Crect x=%228%22 y=%2210%22 width=%2216%22 height=%2212%22 rx=%223%22 fill=%22none%22 stroke=%22%234d9fff%22 stroke-width=%222%22/%3E%3C/svg%3E">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f0f11;color:#e5e5e5;font-size:13px;overflow:hidden;}
+
+/* ── LAYOUT ── */
+.shell{display:flex;flex-direction:column;height:100%;}
+
+/* Topbar */
+.topbar{display:flex;align-items:center;gap:10px;padding:0 16px;height:42px;background:#16161a;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;z-index:10;}
+.topbar-title{font-size:.8rem;font-weight:800;color:#4d9fff;letter-spacing:.02em;}
+.topbar-search{flex:1;max-width:280px;padding:4px 10px;background:#1e1e22;border:1px solid rgba(255,255,255,.1);border-radius:5px;color:#e5e5e5;font-size:.72rem;outline:none;}
+.topbar-search::placeholder{color:#444;}
+.topbar-search:focus{border-color:rgba(77,159,255,.4);}
+.topbar-nav{display:flex;gap:8px;margin-left:auto;}
+.nav-link{font-size:.7rem;font-weight:600;padding:4px 11px;border-radius:5px;color:#888;text-decoration:none;transition:all .15s;border:1px solid transparent;}
+.nav-link:hover{color:#ccc;background:rgba(255,255,255,.05);}
+
+/* Main body */
+.body{display:flex;flex:1;overflow:hidden;}
+
+/* Sidebar */
+.sidebar{width:300px;min-width:220px;max-width:400px;display:flex;flex-direction:column;background:#13131a;border-right:1px solid rgba(255,255,255,.07);overflow:hidden;flex-shrink:0;}
+.sidebar-header{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.sidebar-header h2{font-size:.72rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;flex:1;}
+.sidebar-count{font-size:.65rem;color:#444;background:rgba(255,255,255,.06);padding:2px 7px;border-radius:9999px;}
+.sidebar-list{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#2a2a2a transparent;padding:6px 0;}
+
+/* Project group */
+.proj-group{margin-bottom:2px;}
+.proj-hdr{display:flex;align-items:center;gap:6px;padding:6px 14px;cursor:pointer;user-select:none;font-size:.7rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;transition:color .15s;}
+.proj-hdr:hover{color:#bbb;}
+.proj-chev{font-size:.55rem;color:#555;transition:transform .2s;flex-shrink:0;}
+.proj-chev.open{transform:rotate(90deg);}
+.proj-count{font-size:.6rem;color:#444;margin-left:auto;background:rgba(255,255,255,.05);padding:1px 6px;border-radius:9999px;}
+.proj-body{display:none;}
+.proj-body.open{display:block;}
+
+/* Execution group */
+.exec-group{margin-bottom:1px;}
+.exec-hdr{display:flex;align-items:center;gap:5px;padding:5px 14px 5px 24px;cursor:pointer;user-select:none;transition:background .12s;}
+.exec-hdr:hover{background:rgba(255,255,255,.03);}
+.exec-chev{font-size:.5rem;color:#444;transition:transform .2s;flex-shrink:0;}
+.exec-chev.open{transform:rotate(90deg);}
+.exec-name{font-size:.68rem;color:#999;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.exec-body{display:none;}
+.exec-body.open{display:block;}
+
+/* Report item */
+.report-item{display:flex;align-items:center;gap:7px;padding:7px 14px 7px 34px;cursor:pointer;transition:background .12s;border-left:3px solid transparent;}
+.report-item:hover{background:rgba(255,255,255,.04);}
+.report-item.active{background:rgba(77,159,255,.08);border-left-color:#4d9fff;}
+.report-step{font-size:.68rem;color:#ccc;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.report-item.active .report-step{color:#4d9fff;}
+.report-verdict{font-size:.55rem;font-weight:800;padding:1px 6px;border-radius:9999px;flex-shrink:0;}
+.report-verdict.pass{background:rgba(34,197,94,.15);color:#4ade80;}
+.report-verdict.warn{background:rgba(245,158,11,.15);color:#fbbf24;}
+.report-verdict.fail{background:rgba(239,68,68,.15);color:#f87171;}
+.report-verdict.unknown{background:rgba(255,255,255,.07);color:#666;}
+.report-score{font-size:.58rem;color:#555;flex-shrink:0;}
+
+/* Main content */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.main-empty{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#444;}
+.main-empty .icon{font-size:2.5rem;}
+.main-empty p{font-size:.8rem;}
+
+/* Report viewer */
+.report-view{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#2a2a2a transparent;padding:20px 24px;}
+
+/* Report header */
+.rpt-hdr{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px 20px;margin-bottom:18px;}
+.rpt-hdr-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;}
+.rpt-step-name{font-size:1rem;font-weight:800;color:#fff;flex:1;}
+.rpt-verdict-badge{font-size:.68rem;font-weight:800;padding:4px 12px;border-radius:9999px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0;}
+.rpt-verdict-badge.pass{background:rgba(34,197,94,.18);color:#22c55e;border:1px solid rgba(34,197,94,.3);}
+.rpt-verdict-badge.warn{background:rgba(245,158,11,.18);color:#fbbf24;border:1px solid rgba(245,158,11,.3);}
+.rpt-verdict-badge.fail{background:rgba(239,68,68,.18);color:#ef4444;border:1px solid rgba(239,68,68,.3);}
+.rpt-meta-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.rpt-chip{font-size:.68rem;color:#888;padding:3px 9px;border-radius:9999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);}
+.rpt-summary{font-size:.75rem;color:#999;line-height:1.6;}
+
+/* Stat cards */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:18px;}
+.stat-card{background:#16161a;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:12px 14px;}
+.stat-val{font-size:1.4rem;font-weight:800;color:#fff;line-height:1;}
+.stat-lbl{font-size:.6rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#555;margin-top:4px;}
+.stat-card.s-pass .stat-val{color:#22c55e;}
+.stat-card.s-warn .stat-val{color:#fbbf24;}
+.stat-card.s-fail .stat-val{color:#ef4444;}
+.stat-card.s-blue .stat-val{color:#4d9fff;}
+
+/* Section heading */
+.sec-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07);}
+.sec-hdr h2{font-size:.78rem;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;}
+
+/* File variance cards */
+.vfile-card{border:1px solid rgba(255,255,255,.09);border-radius:8px;margin-bottom:14px;overflow:hidden;}
+.vfile-hdr{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;background:rgba(255,255,255,.03);transition:background .15s;user-select:none;}
+.vfile-hdr:hover{background:rgba(255,255,255,.055);}
+.vfile-name{font-size:.7rem;font-weight:600;color:#ccc;flex:1;font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.vfile-score-pill{font-size:.63rem;font-weight:800;padding:2px 9px;border-radius:9999px;}
+.vfile-score-pill.spill-pass{background:rgba(34,197,94,.16);color:#4ade80;border:1px solid rgba(34,197,94,.25);}
+.vfile-score-pill.spill-warn{background:rgba(245,158,11,.16);color:#fbbf24;border:1px solid rgba(245,158,11,.25);}
+.vfile-score-pill.spill-fail{background:rgba(239,68,68,.16);color:#f87171;border:1px solid rgba(239,68,68,.25);}
+.vfile-bar-track{height:2px;background:rgba(255,255,255,.06);}
+.vfile-bar-fill{height:100%;transition:width .4s ease;}
+.vfile-chev{font-size:.6rem;color:#555;transition:transform .2s;flex-shrink:0;}
+.vfile-chev.open{transform:rotate(180deg);}
+.vfile-body{display:none;border-top:1px solid rgba(255,255,255,.06);}
+.vfile-body.open{display:block;}
+
+/* Filter bar */
+.diff-filter-bar{display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(0,0,0,.2);border-bottom:1px solid rgba(255,255,255,.05);flex-wrap:wrap;}
+.diff-filter-bar .dfb-label{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#555;}
+.dfb-btn{font-size:.6rem;font-weight:700;padding:2px 9px;border-radius:9999px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#666;cursor:pointer;transition:all .15s;}
+.dfb-btn:hover{background:rgba(255,255,255,.06);color:#aaa;}
+.dfb-btn.active{background:rgba(77,159,255,.15);color:#60a5fa;border-color:rgba(77,159,255,.4);}
+.dfb-stat{font-size:.6rem;color:#555;margin-left:auto;}
+.dfb-stat .dfb-ok{color:#4ade80;font-weight:700;}
+.dfb-stat .dfb-bad{color:#f87171;font-weight:700;}
+
+/* Diff table */
+.diff-wrap{overflow-x:auto;scrollbar-width:thin;scrollbar-color:#2a2a2a transparent;}
+.diff-table{width:100%;border-collapse:collapse;font-size:.68rem;table-layout:fixed;}
+.diff-table col.col-field{width:190px;}
+.diff-table col.col-run{width:260px;min-width:200px;}
+.diff-table col.col-status{width:96px;}
+.diff-table thead th{padding:7px 10px;text-align:left;font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#666;background:#0c0c0f;border-bottom:2px solid rgba(255,255,255,.09);white-space:nowrap;position:sticky;top:0;z-index:4;}
+.diff-table th.dt-field-th{position:sticky;left:0;z-index:5;background:#0c0c0f;}
+.diff-table th.dt-status{text-align:center;}
+.diff-th-run-badge{font-size:.55rem;font-weight:700;padding:1px 5px;border-radius:9999px;margin-left:4px;vertical-align:middle;}
+.diff-th-run-badge.ok{background:rgba(34,197,94,.15);color:#4ade80;}
+.diff-th-run-badge.fail{background:rgba(239,68,68,.15);color:#f87171;}
+.diff-table td{padding:0;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top;}
+.dr-consistent{border-left:3px solid rgba(34,197,94,.25);}
+.dr-inconsistent{border-left:3px solid #ef4444;}
+.dr-consistent td{background:rgba(34,197,94,.02);}
+.dr-inconsistent td{background:rgba(239,68,68,.03);}
+.diff-table[data-filter="diffs"] .dr-consistent{display:none;}
+.dt-field-td{position:sticky;left:0;z-index:2;padding:0!important;}
+.dr-consistent .dt-field-td{background:#0d120d;}
+.dr-inconsistent .dt-field-td{background:#140c0c;}
+.dt-field-inner{padding:8px 10px;height:100%;display:flex;flex-direction:column;justify-content:flex-start;gap:2px;}
+.dt-field-key{font-family:monospace;font-size:.64rem;font-weight:700;color:#ccc;line-height:1.3;word-break:break-all;}
+.dr-consistent .dt-field-key{color:#5a7a5a;}
+.dt-field-meta{font-size:.56rem;color:#444;}
+.dt-status-cell{text-align:center;vertical-align:middle;padding:8px 6px!important;}
+.dt-badge-ok{display:inline-block;font-size:.62rem;font-weight:800;padding:3px 8px;border-radius:9999px;background:rgba(34,197,94,.14);color:#22c55e;white-space:nowrap;}
+.dt-badge-fail{display:inline-block;font-size:.62rem;font-weight:800;padding:3px 8px;border-radius:9999px;background:rgba(239,68,68,.14);color:#ef4444;white-space:nowrap;}
+.dt-match-rate{font-size:.57rem;color:#555;margin-top:3px;}
+.dt-cell-consistent{font-family:monospace;font-size:.64rem;color:#4a7a42;padding:7px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4;}
+.dt-scroll{height:160px;overflow-y:auto;overflow-x:hidden;font-family:monospace;font-size:.64rem;line-height:1.6;white-space:pre-wrap;word-break:break-word;padding:8px 10px;scrollbar-width:thin;scrollbar-color:#333 transparent;}
+.dt-scroll.dc-best{color:#fde68a;}
+.dt-scroll.dc-diff{color:#e5e5e5;}
+.diff-ins{background:rgba(34,197,94,.2);color:#4ade80;border-radius:2px;padding:0 2px;}
+.diff-del{background:rgba(239,68,68,.2);color:#f87171;border-radius:2px;padding:0 2px;text-decoration:line-through;opacity:.75;}
+
+/* Legend (diff legend bar) */
+.diff-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.61rem;color:#555;padding:6px 10px 8px;align-items:center;}
+.diff-legend-item{display:flex;align-items:center;gap:5px;}
+.diff-legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+
+/* Structured array renderer */
+.lgd-groups{font-size:.63rem;line-height:1.45;}
+.lgd-group{margin-bottom:7px;}
+.lgd-cat-hdr{font-size:.54rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;padding:2px 0 3px;margin-bottom:2px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:5px;}
+.lgd-cat-count{font-weight:400;opacity:.45;font-size:.52rem;}
+.lgd-row{display:grid;grid-template-columns:18px 1fr 1.5fr;gap:5px;align-items:baseline;padding:2px 4px;border-radius:3px;}
+.lgd-row:nth-child(even){background:rgba(255,255,255,.02);}
+.lgd-pg{font-size:.52rem;font-weight:700;color:#555;text-align:center;}
+.lgd-label{font-weight:600;color:#d4d4d4;font-size:.62rem;}
+.lgd-desc{color:#666;font-size:.59rem;font-style:italic;}
+.lgd-diff-block{margin-bottom:5px;}
+.lgd-diff-hdr{font-size:.57rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:2px 6px;border-radius:3px;margin-bottom:3px;display:inline-block;}
+.lgd-diff-block.same .lgd-diff-hdr{background:rgba(34,197,94,.08);color:#4a7a42;}
+.lgd-diff-block.del .lgd-diff-hdr{background:rgba(239,68,68,.12);color:#f87171;}
+.lgd-diff-block.ins .lgd-diff-hdr{background:rgba(34,197,94,.12);color:#4ade80;}
+.lgd-row-del{background:rgba(239,68,68,.07)!important;border-left:2px solid rgba(239,68,68,.4);}
+.lgd-row-del .lgd-label{color:#fca5a5;}
+.lgd-row-ins{background:rgba(34,197,94,.07)!important;border-left:2px solid rgba(34,197,94,.4);}
+.lgd-row-ins .lgd-label{color:#86efac;}
+
+/* Array tabbed viewer */
+.arr-field-wrap{padding:0;}
+.arr-field-row td{padding:0!important;border-bottom:1px solid rgba(255,255,255,.07)!important;}
+.arr-field-titlebar{display:flex;align-items:center;gap:8px;padding:7px 12px;background:rgba(255,255,255,.02);border-bottom:1px solid rgba(255,255,255,.06);}
+.arr-field-titlebar .dt-field-key{font-size:.68rem;}
+.arr-consistent-badge{font-size:.6rem;font-weight:800;padding:2px 8px;border-radius:9999px;background:rgba(34,197,94,.14);color:#22c55e;margin-left:auto;}
+.arr-diff-badge{font-size:.6rem;font-weight:800;padding:2px 8px;border-radius:9999px;background:rgba(239,68,68,.14);color:#ef4444;margin-left:auto;}
+.arr-tab-bar{display:flex;align-items:stretch;gap:0;border-bottom:1px solid rgba(255,255,255,.07);background:rgba(0,0,0,.2);overflow-x:auto;}
+.arr-tab{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;font-size:.63rem;font-weight:600;color:#555;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s,border-color .15s,background .15s;user-select:none;gap:1px;}
+.arr-tab:hover{color:#aaa;background:rgba(255,255,255,.03);}
+.arr-tab.active{color:#e5e5e5;border-bottom-color:#4d9fff;background:rgba(77,159,255,.06);}
+.arr-tab.tab-baseline.active{color:#fde68a;background:rgba(253,230,138,.06);}
+.arr-tab.tab-diff.active{color:#f87171;border-bottom-color:#ef4444;background:rgba(239,68,68,.06);}
+.arr-tab-run-badge{font-size:.52rem;font-weight:700;padding:1px 5px;border-radius:9999px;}
+.arr-tab-run-badge.ok{background:rgba(34,197,94,.15);color:#4ade80;}
+.arr-tab-run-badge.fail{background:rgba(239,68,68,.15);color:#f87171;}
+.arr-tab-count{font-size:.56rem;color:#555;}
+.arr-tab.active .arr-tab-count{color:#888;}
+.arr-tab-diff-count{font-size:.56rem;}
+.arr-tab-diff-count.has-diff{color:#f87171;}
+.arr-tab-diff-count.no-diff{color:#4ade80;}
+.arr-panel-wrap{position:relative;}
+.arr-panel{display:none;padding:8px 10px;max-height:320px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#2a2a2a transparent;}
+.arr-panel.active{display:block;}
+
+/* Run details */
+.run-section{margin-top:24px;}
+.run-card{background:#16161a;border:1px solid rgba(255,255,255,.07);border-radius:8px;margin-bottom:8px;overflow:hidden;}
+.run-card-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;user-select:none;transition:background .12s;}
+.run-card-hdr:hover{background:rgba(255,255,255,.03);}
+.run-num-badge{font-size:.68rem;font-weight:800;padding:2px 9px;border-radius:9999px;background:rgba(77,159,255,.14);color:#4d9fff;}
+.run-status-badge{font-size:.63rem;font-weight:700;padding:2px 8px;border-radius:9999px;}
+.run-status-badge.ok{background:rgba(34,197,94,.12);color:#4ade80;}
+.run-status-badge.fail{background:rgba(239,68,68,.12);color:#f87171;}
+.run-file-name{font-size:.62rem;color:#444;font-family:monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.run-chev{font-size:.6rem;color:#555;transition:transform .2s;flex-shrink:0;}
+.run-chev.open{transform:rotate(180deg);}
+.run-body{display:none;padding:12px 14px;border-top:1px solid rgba(255,255,255,.06);}
+.run-body.open{display:block;}
+.run-json{font-family:monospace;font-size:.63rem;white-space:pre-wrap;word-break:break-word;color:#a3e635;line-height:1.5;max-height:400px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#333 transparent;}
+.run-loading{font-size:.68rem;color:#555;font-style:italic;padding:4px 0;}
+.run-err{font-size:.68rem;color:#f87171;padding:4px 0;}
+
+/* Loading / empty states */
+.loading-msg{display:flex;align-items:center;justify-content:center;height:100%;color:#555;font-size:.8rem;}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- Topbar -->
+<div class="topbar">
+    <span class="topbar-title">&#128202; Variance Viewer</span>
+    <input class="topbar-search" id="searchInput" type="text" placeholder="Search executions or steps…" oninput="filterSidebar()">
+    <nav class="topbar-nav">
+        <a class="nav-link" href="/index.html">Workflow</a>
+        <a class="nav-link" href="/extractions.html">Extractions</a>
+        <a class="nav-link" href="/report.html">Reports</a>
+        <a class="nav-link" href="/validation_report.html">Validation</a>
+        <a class="nav-link" href="/processes.html">Processes</a>
+    </nav>
+</div>
+
+<div class="body">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>Executions</h2>
+            <span class="sidebar-count" id="sidebarCount">—</span>
+        </div>
+        <div class="sidebar-list" id="sidebarList">
+            <div class="loading-msg">Loading…</div>
+        </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+        <div class="main-empty" id="mainEmpty">
+            <div class="icon">&#128202;</div>
+            <p>Select a variance report from the sidebar</p>
+        </div>
+        <div class="report-view" id="reportView" style="display:none;"></div>
+    </div>
+</div>
+
+</div><!-- .shell -->
+
+<script>
+// ═══════════════════════════════════════════
+//  UTILITIES
+// ═══════════════════════════════════════════
+function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+}
+
+let _syncScrollLock = false;
+function syncDiffScroll(el) {
+    if (_syncScrollLock) return;
+    const key = el.dataset.sync;
+    if (!key) return;
+    _syncScrollLock = true;
+    document.querySelectorAll(`.dt-scroll[data-sync="${key}"]`).forEach(p => { if (p !== el) p.scrollTop = el.scrollTop; });
+    _syncScrollLock = false;
+}
+
+function toggleVFile(bid, chid) {
+    const b = document.getElementById(bid), c = document.getElementById(chid);
+    if (b) { const o = b.classList.toggle('open'); if (c) c.classList.toggle('open', o); }
+}
+
+function toggleRunCard(bid, chid) {
+    const b = document.getElementById(bid), c = document.getElementById(chid);
+    if (b) { const o = b.classList.toggle('open'); if (c) c.classList.toggle('open', o); }
+}
+
+function toggleDiffFilter(btn, tableId) {
+    const tbl = document.getElementById(tableId);
+    if (!tbl) return;
+    const bar = btn.closest('.diff-filter-bar');
+    const btns = bar ? bar.querySelectorAll('.dfb-btn') : [];
+    let clickedIdx = 0;
+    btns.forEach((b, i) => { if (b === btn) clickedIdx = i; });
+    tbl.dataset.filter = clickedIdx === 1 ? 'diffs' : 'all';
+    btns.forEach((b, i) => b.classList.toggle('active', i === clickedIdx));
+}
+
+function switchArrTab(tabEl, wrapperId, panelId) {
+    const wrap = document.getElementById(wrapperId);
+    if (!wrap) return;
+    wrap.querySelectorAll('.arr-tab').forEach(t => t.classList.remove('active'));
+    wrap.querySelectorAll('.arr-panel').forEach(p => p.classList.remove('active'));
+    tabEl.classList.add('active');
+    const panel = document.getElementById(panelId);
+    if (panel) panel.classList.add('active');
+}
+
+// ── Word diff ──────────────────────────────────────────────────────────────
+function wordDiff(reference, candidate) {
+    if (reference === candidate) return esc(candidate);
+    const tokRef  = reference.match(/\S+|\s+/g) || [];
+    const tokCand = candidate.match(/\S+|\s+/g) || [];
+    if (tokRef.length * tokCand.length > 60000) {
+        return `<span class="diff-del">${esc(reference.substring(0,300))}${reference.length>300?'…':''}</span>`
+             + `<span class="diff-ins">${esc(candidate.substring(0,300))}${candidate.length>300?'…':''}</span>`;
+    }
+    const m = tokRef.length, n = tokCand.length;
+    const dp = [];
+    for (let i = 0; i <= m; i++) dp[i] = new Array(n+1).fill(0);
+    for (let i = 1; i <= m; i++)
+        for (let j = 1; j <= n; j++)
+            dp[i][j] = tokRef[i-1]===tokCand[j-1] ? dp[i-1][j-1]+1 : Math.max(dp[i-1][j], dp[i][j-1]);
+    const ops = []; let i = m, j = n;
+    while (i > 0 || j > 0) {
+        if (i>0&&j>0&&tokRef[i-1]===tokCand[j-1]) { ops.push({t:'eq',v:tokCand[j-1]}); i--;j--; }
+        else if (j>0&&(i===0||dp[i][j-1]>=dp[i-1][j])) { ops.push({t:'ins',v:tokCand[j-1]}); j--; }
+        else { ops.push({t:'del',v:tokRef[i-1]}); i--; }
+    }
+    ops.reverse();
+    return ops.map(o => {
+        if (o.t==='eq')  return esc(o.v);
+        if (o.t==='ins') return `<span class="diff-ins">${esc(o.v)}</span>`;
+        return `<span class="diff-del">${esc(o.v)}</span>`;
+    }).join('');
+}
+
+// ── Array helpers ──────────────────────────────────────────────────────────
+function tryParseNormArray(normStr) {
+    if (!normStr || normStr[0] !== '[') return null;
+    try {
+        const arr = JSON.parse(normStr);
+        if (!Array.isArray(arr)) return null;
+        return arr.map(item => {
+            if (typeof item==='string'&&item.length>0&&(item[0]==='{'||item[0]==='[')) {
+                try { return JSON.parse(item); } catch(e) { return item; }
+            }
+            return item;
+        });
+    } catch(e) { return null; }
+}
+
+function _itemKey(item) {
+    return typeof item==='object'&&item!==null ? JSON.stringify(item, Object.keys(item).sort()) : String(item);
+}
+
+function renderLegendItems(items) {
+    if (!items||!items.length) return '<span style="color:#444;">—</span>';
+    const CAT_COLOR = {cable:'#f87171',equipment:'#fbbf24',substation:'#2dd4bf',boundary:'#c4b5fd',earthing:'#fb923c',annotation:'#94a3b8',other:'#888'};
+    const groups = {};
+    items.forEach(item => {
+        if (typeof item!=='object'||item===null) return;
+        const cat = (item.category||'other').toLowerCase();
+        (groups[cat]=groups[cat]||[]).push(item);
+    });
+    let html = '<div class="lgd-groups">';
+    Object.entries(groups).forEach(([cat,entries]) => {
+        const col = CAT_COLOR[cat]||'#888';
+        html += `<div class="lgd-group"><div class="lgd-cat-hdr" style="color:${col};">${esc(cat.toUpperCase())}<span class="lgd-cat-count">${entries.length}</span></div>`;
+        entries.forEach(entry => {
+            html += `<div class="lgd-row"><span class="lgd-pg">${entry.page!=null?'p'+entry.page:''}</span><span class="lgd-label">${esc(entry.label||'')}</span><span class="lgd-desc">${esc(entry.symbol_description||'')}</span></div>`;
+        });
+        html += '</div>';
+    });
+    return html + '</div>';
+}
+
+function renderArrayDiff(refNorm, candNorm) {
+    const refItems  = tryParseNormArray(refNorm)  || [];
+    const candItems = tryParseNormArray(candNorm) || [];
+    const refKeys   = new Set(refItems.map(_itemKey));
+    const candKeys  = new Set(candItems.map(_itemKey));
+    const same      = refItems.filter(i =>  candKeys.has(_itemKey(i)));
+    const deleted   = refItems.filter(i => !candKeys.has(_itemKey(i)));
+    const inserted  = candItems.filter(i => !refKeys.has(_itemKey(i)));
+    const isLegend  = items => items.length>0&&typeof items[0]==='object'&&'label' in items[0]&&'category' in items[0];
+    function entryRows(items, cls) {
+        if (!isLegend(items)) return items.map(i=>`<div class="lgd-row ${cls}"><span class="lgd-pg"></span><span class="lgd-label" style="grid-column:2/4;">${esc(_itemKey(i).substring(0,120))}</span></div>`).join('');
+        return items.map(entry=>`<div class="lgd-row ${cls}"><span class="lgd-pg">${entry.page!=null?'p'+entry.page:''}</span><span class="lgd-label">${esc(entry.label||'')}</span><span class="lgd-desc">${esc(entry.symbol_description||'')}</span></div>`).join('');
+    }
+    let html = '';
+    if (same.length)    html += `<div class="lgd-diff-block same"><span class="lgd-diff-hdr">✓ ${same.length} matching</span></div>`;
+    if (deleted.length) html += `<div class="lgd-diff-block del"><span class="lgd-diff-hdr">− ${deleted.length} removed</span>${entryRows(deleted,'lgd-row-del')}</div>`;
+    if (inserted.length)html += `<div class="lgd-diff-block ins"><span class="lgd-diff-hdr">+ ${inserted.length} added</span>${entryRows(inserted,'lgd-row-ins')}</div>`;
+    if (!html) html = '<span style="color:#4a7a42;font-size:.63rem;">Identical content</span>';
+    return html;
+}
+
+function renderCellValue(normStr) {
+    if (!normStr) return '<span style="color:#444;">—</span>';
+    const items = tryParseNormArray(normStr);
+    if (!items||!items.length) return esc(normStr);
+    const allObj = items.every(i=>typeof i==='object'&&i!==null&&!Array.isArray(i));
+    if (!allObj) return esc(normStr);
+    if ('label' in items[0]&&'category' in items[0]) return renderLegendItems(items);
+    return `<pre style="font-size:.6rem;margin:0;white-space:pre-wrap;color:#aaa;">${esc(JSON.stringify(items,null,2))}</pre>`;
+}
+
+function buildArrayTabs(key, fd, runNums, runFailed, vbr, mcv, consistent, wid) {
+    const isArr = mcv && mcv[0]==='[' && tryParseNormArray(mcv)!==null;
+    function entryCount(s) { const a = tryParseNormArray(s); return a ? a.length : null; }
+    function tabType(v) { if (consistent) return 'match'; return v===mcv ? 'baseline' : 'diff'; }
+    let tabs = '', panels = '';
+
+    runNums.forEach((n, ri) => {
+        const v   = vbr[`run_${n}`]!=null ? String(vbr[`run_${n}`]) : '';
+        const tt  = tabType(v);
+        const ok  = !runFailed[ri];
+        const cnt = isArr ? entryCount(v) : null;
+        const tid = `${wid}-p${n}`;
+        const isFirst = ri===0;
+        let tabCls = 'arr-tab';
+        if (tt==='baseline') tabCls += ' tab-baseline';
+        if (tt==='diff')     tabCls += ' arr-tab-diff tab-diff';
+        if (isFirst)         tabCls += ' active';
+        tabs += `<div class="${tabCls}" onclick="switchArrTab(this,'${wid}','${tid}')">
+            <span>Run ${n} <span class="arr-tab-run-badge ${ok?'ok':'fail'}">${ok?'OK':'FAIL'}</span></span>
+            ${cnt!=null?`<span class="arr-tab-count">${cnt} entries</span>`:''}
+        </div>`;
+        let panelContent;
+        if (!isArr) panelContent = `<div style="font-family:monospace;font-size:.65rem;white-space:pre-wrap;word-break:break-word;color:#d4d4d4;">${esc(v)||'<span style="color:#444;">—</span>'}</div>`;
+        else if (tt==='diff') panelContent = renderArrayDiff(mcv, v);
+        else panelContent = renderCellValue(v);
+        panels += `<div class="arr-panel${isFirst?' active':''}" id="${tid}">${panelContent}</div>`;
+    });
+
+    if (!consistent) {
+        const dtid = `${wid}-pdiff`;
+        const allDiffs = runNums.map(n => {
+            const v = vbr[`run_${n}`]!=null ? String(vbr[`run_${n}`]) : '';
+            return v===mcv ? null : v;
+        }).filter(v=>v!==null);
+        let totalDel=0, totalIns=0;
+        allDiffs.forEach(v => {
+            const ri = tryParseNormArray(mcv)||[], ci = tryParseNormArray(v)||[];
+            const rk = new Set(ri.map(_itemKey)), ck = new Set(ci.map(_itemKey));
+            totalDel += ri.filter(i=>!ck.has(_itemKey(i))).length;
+            totalIns += ci.filter(i=>!rk.has(_itemKey(i))).length;
+        });
+        const hasDiff = totalDel>0||totalIns>0;
+        const diffLbl = hasDiff ? `<span class="arr-tab-diff-count has-diff">−${totalDel} +${totalIns}</span>` : `<span class="arr-tab-diff-count no-diff">identical</span>`;
+        tabs += `<div class="arr-tab arr-tab-diff" onclick="switchArrTab(this,'${wid}','${dtid}')"><span>Diff Summary</span>${diffLbl}</div>`;
+        let diffContent = '';
+        if (!hasDiff) diffContent = `<div style="font-size:.65rem;color:#4a7a42;padding:6px;">All runs returned identical entries.</div>`;
+        else runNums.forEach(n => {
+            const v = vbr[`run_${n}`]!=null ? String(vbr[`run_${n}`]) : '';
+            if (v===mcv) return;
+            diffContent += `<div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#888;padding:4px 0 2px;">Run ${n} vs baseline</div>`;
+            diffContent += renderArrayDiff(mcv, v);
+        });
+        panels += `<div class="arr-panel" id="${dtid}">${diffContent}</div>`;
+    }
+
+    const mr = fd.match_rate!=null ? Math.round(fd.match_rate*100) : '?';
+    const badge = consistent
+        ? `<span class="arr-consistent-badge">✓ 100% consistent</span>`
+        : `<span class="arr-diff-badge">✗ ${mr}% · ${fd.unique_value_count} unique</span>`;
+    const displayKey = key.replace(/^sub-step-/,'');
+    return `<div class="arr-field-wrap" id="${wid}">
+        <div class="arr-field-titlebar"><div class="dt-field-key">${esc(displayKey)}</div>${badge}</div>
+        <div class="arr-tab-bar">${tabs}</div>
+        <div class="arr-panel-wrap">${panels}</div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════
+//  SIDEBAR BUILDER
+// ═══════════════════════════════════════════
+let allExecutions = {};  // { execFolder: [reportMeta] }
+let selectedPath  = null;
+
+const API = '/api/orchestrator';
+
+async function loadSidebar() {
+    try {
+        const res = await fetch(`${API}/variance_reports`);
+        const data = await res.json();
+        allExecutions = data.executions || {};
+        renderSidebar(allExecutions);
+    } catch(e) {
+        document.getElementById('sidebarList').innerHTML =
+            `<div style="padding:12px 14px;font-size:.7rem;color:#f87171;">Failed to load: ${esc(String(e))}</div>`;
+    }
+}
+
+function renderSidebar(executions) {
+    const list = document.getElementById('sidebarList');
+    const entries = Object.entries(executions);
+    if (!entries.length) {
+        list.innerHTML = '<div style="padding:12px 14px;font-size:.7rem;color:#555;">No variance reports found.</div>';
+        document.getElementById('sidebarCount').textContent = '0';
+        return;
+    }
+
+    // Group by project prefix (text before " - ")
+    const projects = {};
+    let totalReports = 0;
+    entries.forEach(([folder, reports]) => {
+        const proj = folder.split(' - ')[0] || folder;
+        (projects[proj] = projects[proj] || {})[folder] = reports;
+        totalReports += reports.length;
+    });
+    document.getElementById('sidebarCount').textContent = totalReports;
+
+    let html = '';
+    Object.entries(projects).sort(([a],[b])=>a.localeCompare(b)).forEach(([proj, folders], pi) => {
+        const pgid = `proj-${pi}`;
+        const pbid = `projb-${pi}`;
+        html += `<div class="proj-group">
+            <div class="proj-hdr" onclick="toggleProjGroup('${pbid}','${pgid}')">
+                <span class="proj-chev" id="${pgid}">▶</span>
+                ${esc(proj)}
+                <span class="proj-count">${Object.values(folders).reduce((s,r)=>s+r.length,0)}</span>
+            </div>
+            <div class="proj-body" id="${pbid}">`;
+
+        Object.entries(folders).sort(([a],[b])=>b.localeCompare(a)).forEach(([folder, reports], ei) => {
+            const execLabel = folder.split(' - ').slice(1).join(' - ') || folder;
+            const egid = `exec-${pi}-${ei}`;
+            const ebid = `execb-${pi}-${ei}`;
+            html += `<div class="exec-group">
+                <div class="exec-hdr" onclick="toggleExecGroup('${ebid}','${egid}')">
+                    <span class="exec-chev" id="${egid}">▶</span>
+                    <span class="exec-name" title="${esc(folder)}">${esc(execLabel)}</span>
+                </div>
+                <div class="exec-body" id="${ebid}">`;
+
+            reports.forEach(rpt => {
+                const verdLc = (rpt.verdict||'').toLowerCase()||'unknown';
+                const score = rpt.consistency_score!=null ? Math.round(rpt.consistency_score*100)+'%' : '';
+                const safePath = rpt.path.replace(/"/g,'&quot;');
+                html += `<div class="report-item" data-path="${safePath}" onclick="selectReport('${safePath}', this)"
+                    data-search="${esc((folder+' '+rpt.step_name).toLowerCase())}">
+                    <span class="report-step" title="${esc(rpt.step_name)}">${esc(rpt.step_name)}</span>
+                    <span class="report-verdict ${verdLc}">${esc((rpt.verdict||'?').toUpperCase())}</span>
+                    ${score ? `<span class="report-score">${score}</span>` : ''}
+                </div>`;
+            });
+            html += '</div></div>';
+        });
+        html += '</div></div>';
+    });
+    list.innerHTML = html;
+}
+
+function toggleProjGroup(bodyId, chevId) {
+    const b = document.getElementById(bodyId), c = document.getElementById(chevId);
+    if (b) { const o = b.classList.toggle('open'); if (c) c.classList.toggle('open', o); }
+}
+function toggleExecGroup(bodyId, chevId) {
+    const b = document.getElementById(bodyId), c = document.getElementById(chevId);
+    if (b) { const o = b.classList.toggle('open'); if (c) c.classList.toggle('open', o); }
+}
+
+function filterSidebar() {
+    const q = document.getElementById('searchInput').value.trim().toLowerCase();
+    if (!q) { renderSidebar(allExecutions); return; }
+
+    const filtered = {};
+    Object.entries(allExecutions).forEach(([folder, reports]) => {
+        const matchingReports = reports.filter(r =>
+            folder.toLowerCase().includes(q) || r.step_name.toLowerCase().includes(q)
+        );
+        if (matchingReports.length) filtered[folder] = matchingReports;
+    });
+    renderSidebar(filtered);
+
+    // Auto-expand all groups when searching
+    document.querySelectorAll('.proj-body,.exec-body').forEach(b => b.classList.add('open'));
+    document.querySelectorAll('.proj-chev,.exec-chev').forEach(c => c.classList.add('open'));
+}
+
+// ═══════════════════════════════════════════
+//  REPORT RENDERER
+// ═══════════════════════════════════════════
+async function selectReport(path, itemEl) {
+    // Highlight sidebar item
+    document.querySelectorAll('.report-item').forEach(el => el.classList.remove('active'));
+    if (itemEl) itemEl.classList.add('active');
+
+    // Auto-open parent groups
+    if (itemEl) {
+        let p = itemEl.parentElement;
+        while (p) {
+            if (p.classList.contains('exec-body') || p.classList.contains('proj-body')) p.classList.add('open');
+            const chevId = p.id ? p.id.replace('b-', '-') : null;
+            if (chevId) { const c = document.getElementById(chevId); if (c) c.classList.add('open'); }
+            p = p.parentElement;
+        }
+    }
+
+    selectedPath = path;
+    document.getElementById('mainEmpty').style.display = 'none';
+    const view = document.getElementById('reportView');
+    view.style.display = 'block';
+    view.innerHTML = '<div class="loading-msg">Loading report…</div>';
+
+    try {
+        const res = await fetch(`${API}/output_file/${encodeURIComponent(path)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const vr = await res.json();
+        renderReport(vr, path);
+    } catch(e) {
+        view.innerHTML = `<div style="padding:20px;color:#f87171;">Failed to load report: ${esc(String(e))}</div>`;
+    }
+}
+
+function renderReport(vr, path) {
+    const view = document.getElementById('reportView');
+
+    const verdict    = (vr.verdict || '').toLowerCase();
+    const score      = vr.consistency_score != null ? Math.round(vr.consistency_score * 100) : null;
+    const nRuns      = vr.num_runs || 0;
+    const nFiles     = vr.files_analysed || 0;
+    const consistF   = vr.consistent_fields || 0;
+    const totalF     = vr.total_fields || 0;
+    const fileVar    = vr.file_variance || {};
+    const runFiles   = vr.run_output_files || [];
+
+    // Infer run numbers (1-based)
+    const runNums  = runFiles.map((_,i) => i+1);
+    const runFailed = runFiles.map(() => false);  // failure info not in the report file directly
+
+    // ── Header ──────────────────────────────────────────────────────────────
+    let html = `<div class="rpt-hdr">
+        <div class="rpt-hdr-top">
+            <span class="rpt-step-name">${esc(vr.step_name || 'Variance Report')}</span>
+            ${verdict ? `<span class="rpt-verdict-badge ${verdict}">${esc(vr.verdict)}</span>` : ''}
+        </div>
+        <div class="rpt-meta-row">
+            <span class="rpt-chip">${nRuns} runs</span>
+            ${nFiles ? `<span class="rpt-chip">${nFiles} file${nFiles!==1?'s':''} compared</span>` : ''}
+            ${score!=null ? `<span class="rpt-chip">${score}% consistent</span>` : ''}
+            <span class="rpt-chip" title="${esc(path)}">${esc(path.split('/').slice(-2).join('/'))} </span>
+        </div>
+        ${vr.summary ? `<div class="rpt-summary">${esc(vr.summary)}</div>` : ''}
+    </div>`;
+
+    // ── Stat cards ───────────────────────────────────────────────────────────
+    const verdClass = score!=null ? (score>=90?'s-pass':score>=70?'s-warn':'s-fail') : '';
+    html += `<div class="stat-row">
+        <div class="stat-card s-blue"><div class="stat-val">${nRuns}</div><div class="stat-lbl">Runs</div></div>
+        <div class="stat-card"><div class="stat-val">${nFiles}</div><div class="stat-lbl">Files</div></div>
+        ${totalF ? `<div class="stat-card s-pass"><div class="stat-val">${consistF}</div><div class="stat-lbl">Matching</div></div>` : ''}
+        ${totalF ? `<div class="stat-card ${consistF<totalF?'s-fail':'s-pass'}"><div class="stat-val">${totalF-consistF}</div><div class="stat-lbl">Diffs</div></div>` : ''}
+        ${score!=null ? `<div class="stat-card ${verdClass}"><div class="stat-val">${score}%</div><div class="stat-lbl">Score</div></div>` : ''}
+    </div>`;
+
+    // ── File variance diff tables ─────────────────────────────────────────────
+    if (Object.keys(fileVar).length) {
+        html += `<div class="sec-hdr"><h2>Field Comparison by Run</h2></div>`;
+        html += `<div class="diff-legend">
+            <span class="diff-legend-item"><span class="diff-legend-dot" style="background:rgba(74,122,66,.4);border:1px solid #4a7a4255;"></span>Identical across all runs</span>
+            <span class="diff-legend-item"><span class="diff-legend-dot" style="background:rgba(253,230,138,.2);border:1px solid #fde68a33;"></span>Most-common baseline</span>
+            <span class="diff-legend-item"><span class="diff-ins" style="font-size:.62rem;padding:0 4px;">inserted</span> Added vs baseline</span>
+            <span class="diff-legend-item"><span class="diff-del" style="font-size:.62rem;padding:0 4px;">removed</span> Deleted vs baseline</span>
+        </div>`;
+
+        Object.entries(fileVar).forEach(([fname, frpt], fi) => {
+            const fScoreRaw = frpt.file_consistency_score != null ? frpt.file_consistency_score : 1;
+            const fScore    = Math.round(fScoreRaw * 100);
+            const fPillCls  = fScore>=90 ? 'spill-pass' : fScore>=70 ? 'spill-warn' : 'spill-fail';
+            const fBarColor = fScore>=90 ? '#4ade80' : fScore>=70 ? '#fbbf24' : '#f87171';
+            const fields    = frpt.fields || {};
+            const fbid      = `vrfb-${fi}`;
+            const fchid     = `vrfch-${fi}`;
+            const tblId     = `dft-${fi}`;
+            const inconCount   = Object.values(fields).filter(f=>!f.is_consistent).length;
+            const consistCount = Object.keys(fields).length - inconCount;
+
+            html += `<div class="vfile-card">
+                <div class="vfile-hdr" onclick="toggleVFile('${fbid}','${fchid}')">
+                    <span class="vfile-name" title="${esc(fname)}">${esc(fname)}</span>
+                    <span class="vfile-score-pill ${fPillCls}">${fScore}%</span>
+                    <span class="vfile-chev open" id="${fchid}">▾</span>
+                </div>
+                <div class="vfile-bar-track"><div class="vfile-bar-fill" style="width:${fScore}%;background:${fBarColor};"></div></div>
+                <div class="vfile-body open" id="${fbid}">`;
+
+            if (!Object.keys(fields).length) {
+                html += '<div style="font-size:.68rem;color:#555;padding:10px 12px;">No field data.</div>';
+            } else {
+                // Infer run numbers from field data
+                const sampleField = Object.values(fields)[0];
+                const vbSample = sampleField ? sampleField.values_by_run || {} : {};
+                const inferredRunNums = Object.keys(vbSample).map(k=>parseInt(k.replace('run_',''))).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+                const useRunNums = inferredRunNums.length ? inferredRunNums : runNums;
+                const useRunFailed = useRunNums.map(()=>false);
+
+                html += `<div class="diff-filter-bar">
+                    <span class="dfb-label">Show</span>
+                    <button class="dfb-btn active" onclick="toggleDiffFilter(this,'${tblId}')">All fields</button>
+                    <button class="dfb-btn" onclick="toggleDiffFilter(this,'${tblId}')">Diffs only</button>
+                    <span class="dfb-stat">
+                        <span class="dfb-ok">${consistCount} match</span>
+                        ${inconCount?` &nbsp;·&nbsp; <span class="dfb-bad">${inconCount} diff${inconCount!==1?'s':''}</span>`:''}
+                    </span>
+                </div>`;
+
+                const colTags = `<col class="col-field">${useRunNums.map(()=>`<col class="col-run">`).join('')}<col class="col-status">`;
+                const runHeaders = useRunNums.map((n,ri) => {
+                    const ok = !useRunFailed[ri];
+                    return `<th class="dt-run">${esc('Run '+n)}<span class="diff-th-run-badge ${ok?'ok':'fail'}">${ok?'OK':'FAIL'}</span></th>`;
+                }).join('');
+
+                html += `<div class="diff-wrap"><table class="diff-table" id="${tblId}">
+                    <colgroup>${colTags}</colgroup>
+                    <thead><tr>
+                        <th class="dt-field-th">Field</th>
+                        ${runHeaders}
+                        <th class="dt-status">Status</th>
+                    </tr></thead><tbody>`;
+
+                let rowIdx = 0;
+                Object.entries(fields).forEach(([key, fd]) => {
+                    const consistent = fd.is_consistent;
+                    const mcv  = fd.most_common_value != null ? String(fd.most_common_value) : '';
+                    const mr   = fd.match_rate != null ? Math.round(fd.match_rate*100) : '?';
+                    const vbr  = fd.values_by_run || {};
+                    const rowCls  = consistent ? 'dr-consistent' : 'dr-inconsistent';
+                    const syncKey = `s${fi}-${rowIdx}`;
+                    const displayKey = key.replace(/^sub-step-/,'');
+                    const fieldMeta  = consistent ? '100% match' : `${mr}% · ${fd.unique_value_count} unique`;
+                    const totalCols  = useRunNums.length + 2;
+                    const isArrayField = mcv && mcv[0]==='[' && tryParseNormArray(mcv)!==null;
+
+                    if (isArrayField) {
+                        const wid = `arrtab-${fi}-${rowIdx}`;
+                        const tabsHtml = buildArrayTabs(key, fd, useRunNums, useRunFailed, vbr, mcv, consistent, wid);
+                        html += `<tr class="${rowCls} arr-field-row"><td colspan="${totalCols}">${tabsHtml}</td></tr>`;
+                    } else {
+                        let cells;
+                        if (consistent) {
+                            cells = useRunNums.map(n => {
+                                const v = vbr[`run_${n}`]!=null ? String(vbr[`run_${n}`]) : '';
+                                return `<td><div class="dt-cell-consistent" title="${esc(v)}">${esc(v)||'<span style="color:#333;">—</span>'}</div></td>`;
+                            }).join('');
+                        } else {
+                            cells = useRunNums.map(n => {
+                                const v = vbr[`run_${n}`]!=null ? String(vbr[`run_${n}`]) : '';
+                                if (v===mcv) return `<td><div class="dt-scroll dc-best" data-sync="${syncKey}" onscroll="syncDiffScroll(this)">${esc(v)||'<span style="color:#444;">—</span>'}</div></td>`;
+                                return `<td><div class="dt-scroll dc-diff" data-sync="${syncKey}" onscroll="syncDiffScroll(this)">${wordDiff(mcv,v)||'<span style="color:#444;">—</span>'}</div></td>`;
+                            }).join('');
+                        }
+                        const statusCell = consistent
+                            ? `<span class="dt-badge-ok">✓ 100%</span>`
+                            : `<span class="dt-badge-fail">✗ ${mr}%</span><div class="dt-match-rate">${fd.unique_value_count} unique</div>`;
+                        html += `<tr class="${rowCls}">
+                            <td class="dt-field-td"><div class="dt-field-inner">
+                                <div class="dt-field-key" title="${esc(key)}">${esc(displayKey)}</div>
+                                <div class="dt-field-meta">${esc(fieldMeta)}</div>
+                            </div></td>
+                            ${cells}
+                            <td class="dt-status-cell">${statusCell}</td>
+                        </tr>`;
+                    }
+                    rowIdx++;
+                });
+                html += `</tbody></table></div>`;
+            }
+            html += `</div></div>`;
+        });
+    }
+
+    // ── Run Details ──────────────────────────────────────────────────────────
+    if (runFiles.length) {
+        html += `<div class="run-section">
+            <div class="sec-hdr"><h2>Run Results</h2></div>`;
+        runFiles.forEach((filePath, ri) => {
+            const rn   = ri + 1;
+            const fname = filePath.split(/[\\/]/).pop();
+            const rbid = `runb-${ri}`;
+            const rchid = `runch-${ri}`;
+            const safePath = filePath.replace(/"/g,'&quot;');
+            html += `<div class="run-card">
+                <div class="run-card-hdr" onclick="loadRunDetail('${safePath}','${rbid}','${rchid}',this)">
+                    <span class="run-num-badge">Run ${rn}</span>
+                    <span class="run-file-name">${esc(fname)}</span>
+                    <span class="run-chev" id="${rchid}">▾</span>
+                </div>
+                <div class="run-body" id="${rbid}">
+                    <div class="run-loading">Click to load…</div>
+                </div>
+            </div>`;
+        });
+        html += `</div>`;
+    }
+
+    view.innerHTML = html;
+}
+
+// Load a run's JSON on demand (only when expanded)
+const _runLoaded = {};
+async function loadRunDetail(filePath, bodyId, chevId, hdrEl) {
+    const body = document.getElementById(bodyId);
+    if (!body) return;
+    const isOpen = body.classList.toggle('open');
+    const chev = document.getElementById(chevId);
+    if (chev) chev.classList.toggle('open', isOpen);
+
+    if (!isOpen || _runLoaded[bodyId]) return;
+    _runLoaded[bodyId] = true;
+
+    body.innerHTML = '<div class="run-loading">Loading…</div>';
+
+    // Strip leading /app/ for the API call (files are stored as /app/OUTPUT/...)
+    const relPath = filePath.replace(/^\/app\//, '');
+    try {
+        const res = await fetch(`${API}/output_file/${encodeURIComponent(relPath)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        renderRunBody(body, data);
+    } catch(e) {
+        body.innerHTML = `<div class="run-err">Failed to load: ${esc(String(e))}</div>`;
+    }
+}
+
+function renderRunBody(body, data) {
+    // Show a summary + collapsible raw JSON
+    const extractions = data.extractions || [];
+    let html = '';
+
+    if (extractions.length) {
+        html += `<div style="margin-bottom:12px;">`;
+        extractions.forEach((ex, ei) => {
+            html += `<div style="margin-bottom:8px;padding:8px 10px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:6px;">`;
+            html += `<div style="font-size:.65rem;font-weight:700;color:#888;margin-bottom:6px;font-family:monospace;">${esc(ex.filename||'File '+(ei+1))}</div>`;
+            if (ex.extracted_data && typeof ex.extracted_data === 'object') {
+                Object.entries(ex.extracted_data).forEach(([k,v]) => {
+                    const vStr = typeof v === 'object' ? JSON.stringify(v) : String(v);
+                    html += `<div style="display:grid;grid-template-columns:160px 1fr;gap:6px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:.65rem;">
+                        <span style="color:#666;font-family:monospace;">${esc(k)}</span>
+                        <span style="color:#ccc;word-break:break-word;">${esc(vStr.substring(0,300))}${vStr.length>300?'…':''}</span>
+                    </div>`;
+                });
+            } else if (ex.result) {
+                html += `<div style="font-size:.65rem;color:#ccc;">${esc(String(ex.result).substring(0,500))}</div>`;
+            }
+            html += `</div>`;
+        });
+        html += `</div>`;
+    }
+
+    // Raw JSON toggle
+    const jsonStr = JSON.stringify(data, null, 2);
+    const rawId = `raw-${Math.random().toString(36).slice(2)}`;
+    html += `<details><summary style="cursor:pointer;font-size:.65rem;color:#555;user-select:none;margin-bottom:4px;">Raw JSON (${(jsonStr.length/1024).toFixed(1)} KB)</summary>
+        <div class="run-json">${esc(jsonStr)}</div>
+    </details>`;
+
+    body.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+loadSidebar();
+</script>
+</body>
+</html>

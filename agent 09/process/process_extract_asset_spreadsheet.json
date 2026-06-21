@@ -1,0 +1,448 @@
+{
+  "process_id": "proc-extract-asset-spreadsheet",
+  "process_name": "Extract Information from Asset Spreadsheet",
+  "version": "1.0",
+  "worker_id": "dw-junior-engineer",
+  "worker_name": "Junior Engineer",
+
+  "route_to_step": 6,
+  "preferred_model": "claude-sonnet-4-6",
+  "force_category_for_extensions": [".xlsx", ".xls", ".xlsm", ".xlsb"],
+
+  "extraction_categories": [
+    {
+      "id": "asset_records",
+      "name": "Asset Records",
+      "keywords": ["Asset ID", "Asset Number", "Asset Type", "Condition Rating", "Serial Number", "Manufacturer", "Voltage Level", "Installation Date"],
+      "relevance_threshold": 0.3,
+      "behavior": "tabular"
+    }
+  ],
+
+  "validation_directives": [
+    {
+      "id": "TC-ASSET-COMPLETENESS",
+      "name": "Asset record row completeness",
+      "trigger": "extraction",
+      "search_keywords": ["Asset ID", "Asset Number", "Serial Number", "Asset Type"],
+      "expected_category": "asset_records",
+      "description": "Count rows in source spreadsheet vs extracted asset_records. Verify no rows were dropped."
+    },
+    {
+      "id": "TC-ASSET-INTEGRITY",
+      "name": "Asset field value accuracy",
+      "trigger": "extraction",
+      "search_keywords": ["Condition Rating", "Voltage Level", "Manufacturer"],
+      "expected_category": "asset_records",
+      "description": "Spot-check 5 asset records: verify asset_id, asset_type, and condition_rating match source spreadsheet values exactly."
+    }
+  ],
+
+  "conditional_rules": [],
+
+  "summary": "Review and extract key asset data from a submitted asset register spreadsheet. The process identifies all relevant spreadsheet files (.xlsx, .xls, .xlsm, .xlsb) in the document package, reads each matched file, and extracts structured asset records covering: Asset ID, Asset Type, Description, Location, Installation Date, Condition Rating, Status, Manufacturer, Model, Serial Number, Capacity/Rating, and Voltage Level. Produces a structured JSON output per document and a consolidated process output.",
+  "search_context": "Asset register or asset management spreadsheet files submitted as part of a project document package. Target documents include: Excel spreadsheets (.xlsx, .xls, .xlsm, .xlsb) containing lists of electrical network assets (transformers, switchgear, cables, poles, substations, meters), asset inventory registers, asset condition assessment spreadsheets, and equipment schedules. Key filename indicators: documents with 'ASSET', 'REGISTER', 'SCHEDULE', 'INVENTORY', 'EQUIPMENT', or 'PLANT' in the filename. Key content indicators: tabular data with columns for asset identifiers, asset types, locations, condition ratings, and technical specifications. Exclude: PDF documents and engineering drawings — these are covered by separate processes.",
+  "process_input": {
+    "description": "A folder containing the document package for a project, including all relevant spreadsheet files containing asset register or equipment schedule data.",
+    "format": "Folder path containing .xlsx or .xls spreadsheet files",
+    "example": "/documents/DAR1509-84/",
+    "required_fields": [
+      "folder_path"
+    ]
+  },
+  "process_output": {
+    "description": "A structured JSON object containing the extracted asset records from the spreadsheet, including all technical specifications and condition data linked to the source file and sheet.",
+    "format": "JSON",
+    "required_fields": [
+      "asset_records",
+      "total_assets",
+      "source_documents"
+    ]
+  },
+  "document_categorisation": {
+    "description": "Rules for identifying and categorising a document as an 'Asset Spreadsheet'. When Step 2 assigns a document_category field to each entry in the processing plan, it must apply these rules. A document must satisfy at least two positive indicators and must not satisfy any negative indicators to be categorised as 'Asset Spreadsheet'.",
+    "category": "TAL",
+    "positive_indicators": {
+      "filename_patterns": [
+        "Contains 'ASSET' or 'asset' (e.g. ASSET_REGISTER, Asset_List)",
+        "Contains 'REGISTER' or 'register'",
+        "Contains 'SCHEDULE' or 'schedule' in the filename",
+        "Contains 'INVENTORY' or 'inventory'",
+        "Contains 'EQUIPMENT' or 'equipment'",
+        "Contains 'PLANT' in conjunction with register or list",
+        "Has file extension .xlsx, .xls, .xlsm, or .xlsb"
+      ],
+      "document_type_values": [
+        "Asset Register",
+        "Asset Schedule",
+        "Equipment Schedule",
+        "Plant Register",
+        "Asset Inventory",
+        "Asset Condition Assessment",
+        "Network Asset Register"
+      ],
+      "content_keywords": [
+        "Asset ID",
+        "Asset Number",
+        "Asset Type",
+        "Asset Category",
+        "Condition Rating",
+        "Installation Date",
+        "Serial Number",
+        "Manufacturer",
+        "Model Number",
+        "Voltage Level",
+        "kVA",
+        "MVA",
+        "Status",
+        "Location"
+      ],
+      "structural_indicators": [
+        "Is a spreadsheet file (.xlsx or .xls)",
+        "Contains a header row with column names for asset fields",
+        "Contains one row per asset record",
+        "Contains columns for asset identification (ID or serial number) and asset type"
+      ]
+    },
+    "negative_indicators": {
+      "description": "If any of these are present, the document must NOT be categorised as 'Asset Spreadsheet'.",
+      "filename_patterns": [
+        "Contains 'RETIC' or 'retic' (indicates a reticulation drawing)",
+        "Contains 'DWG' (indicates an engineering drawing file)",
+        "Contains 'BRIEF' or 'brief' (indicates a design brief)"
+      ],
+      "document_type_values": [
+        "Design Brief",
+        "Reticulation Drawing",
+        "Electrical Network Diagram",
+        "Site Plan Drawing"
+      ],
+      "content_keywords": [
+        "Method of Supply Requirement (as a section heading — indicates a design brief)",
+        "Substation Notes (as a drawing annotation — indicates a site plan)"
+      ]
+    },
+    "decision_rule": "If the file has extension .xlsx or .xls and its filename or content contains asset register indicators (ASSET, REGISTER, SCHEDULE, INVENTORY, EQUIPMENT), classify as 'Asset Spreadsheet'. If the file is a PDF, it belongs to another process. When uncertain, prefer 'Asset Spreadsheet' for any tabular spreadsheet file containing rows of asset records."
+  },
+  "steps": [
+    {
+      "step_number": 1,
+      "step_id": "step-identify-asset-spreadsheets",
+      "step_name": "Identify and Review Asset Spreadsheet Files",
+      "summary": "Scan the submitted document package folder, assess each file against the asset spreadsheet search context, and produce a structured list of matched spreadsheet files with extracted metadata. Identifies which files are asset registers, equipment schedules, or inventory spreadsheets.",
+      "details": "Upload the document package folder path to the Document Reviewer Agent. The agent lists all files in the folder (including .xlsx and .xls), assesses each filename for relevance using an LLM (targeting asset registers, equipment schedules, and inventory spreadsheets), reads file content for matched candidates using openpyxl, and performs a content match analysis. Returns a ranked list of matched documents with metadata. Only documents with overall_confidence > 0.5 are included in the matched documents list. The output file is saved to the OUTPUT directory.",
+      "expected_input": {
+        "description": "A folder path containing the document package.",
+        "fields": {
+          "folder_path": "Absolute path to the folder containing spreadsheet files (e.g. /documents/DAR1509-84/)",
+          "search_context": "Asset register or equipment schedule spreadsheet files for a project, including: Excel files (.xlsx, .xls) containing lists of electrical network assets, asset inventory registers, and equipment schedules with columns for Asset ID, Asset Type, Location, Condition Rating, and technical specifications."
+        }
+      },
+      "expected_output": {
+        "description": "A DocumentReview JSON file listing all matched spreadsheet files with metadata and quality indicators.",
+        "fields": {
+          "documents": "Array of matched document objects, each with filename, document_title, document_type, author, date, confidence, content_type, text_quality, and recommended_reader",
+          "scan_results": "Full scan results for all files including those not matched",
+          "matched_files": "Integer count of matched files",
+          "total_files_scanned": "Integer count of all files scanned",
+          "output_file": "Path to the saved DocumentReview_*.json file"
+        }
+      },
+      "actual_input": {
+        "source": "User-provided folder path via the frontend folder prompt",
+        "agent_id": "agent-document-reviewer",
+        "tool_id": "tool-list-folder-files",
+        "endpoint": "POST http://document-reviewer:8089/review"
+      },
+      "actual_output": {
+        "stored_as": "state.results.document_review",
+        "file_pattern": "OUTPUT/DocumentReview_<timestamp>.json",
+        "key_used_by_next_step": "output_file"
+      }
+    },
+    {
+      "step_number": 2,
+      "step_id": "step-plan-document-processing",
+      "step_name": "Plan Document Processing Approach",
+      "summary": "Read the Step 1 document review output and the tool registry to determine the best processing tool for each matched spreadsheet file and the extraction method to use.",
+      "details": "The Document Processing Planner reads the Step 1 DocumentReview output file and the registry.json. For each document in the matched list, it uses an LLM to assess the document's content_type and text_quality and selects the most appropriate processing tool from the registry. Spreadsheet files (.xlsx, .xls) are text-based and can be read directly via openpyxl. Outputs a ProcessingPlan JSON file with one entry per document.",
+      "expected_input": {
+        "description": "The Step 1 DocumentReview output file path, automatically retrieved from the orchestrator state.",
+        "fields": {
+          "step1_output_file": "Path to the DocumentReview_*.json file produced by Step 1"
+        }
+      },
+      "expected_output": {
+        "description": "A ProcessingPlan JSON file with a processing entry per matched spreadsheet file.",
+        "fields": {
+          "processing_plan": "Array of processing entries, each with: filename, document_type, content_type, text_quality, recommended_reader, processing_tool_id, conversion_required, conversion_type, extraction_method, processing_notes",
+          "total_documents": "Integer count of entries in processing_plan",
+          "output_file": "Path to the saved ProcessingPlan_*.json file"
+        }
+      },
+      "actual_input": {
+        "source": "Automatically passed from Step 1 output — no user input required",
+        "agent_id": "agent-document-reviewer",
+        "tool_id": "tool-plan-document-processing",
+        "endpoint": "POST http://document-reviewer:8089/plan_processing"
+      },
+      "actual_output": {
+        "stored_as": "state.results.processing_plan",
+        "file_pattern": "OUTPUT/ProcessingPlan_<timestamp>.json",
+        "key_used_by_next_step": "processing_plan"
+      }
+    },
+    {
+      "step_number": 3,
+      "step_id": "step-extract-asset-data",
+      "step_name": "Extract Asset Records from Spreadsheet",
+      "summary": "For each matched asset spreadsheet, extract all asset records including identification, classification, location, technical specifications, condition ratings, and status fields. Each extracted asset record is linked to its source file and sheet.",
+      "details": "Using the processing plan from Step 2, each matched spreadsheet file is read using the tool specified in processing_tool_id. The extracted tabular content is passed to an LLM which identifies the header row, maps column names to standard asset fields, and extracts each row as a structured asset record. Sub-steps cover: asset identification, asset classification and type, location data, technical specifications (capacity, voltage, ratings), condition and status, and installation/maintenance dates.",
+      "sub_steps": [
+        {
+          "sub_step_number": 1,
+          "sub_step_id": "sub-step-extract-asset-identification",
+          "sub_step_name": "Extract Asset Identification",
+          "details": "Extract the unique identifiers for each asset record, including Asset ID, Asset Number, Serial Number, and any network operator assigned reference codes.",
+          "instructional_sub_steps": [
+            {
+              "title": "Locate Asset ID Columns",
+              "instructions": "Identify the column(s) in the spreadsheet header row that serve as unique identifiers for each asset. Look for column names such as 'Asset ID', 'Asset Number', 'Asset Ref', 'ID', 'Tag Number', or 'Equipment Number'. Extract the value from each row."
+            },
+            {
+              "title": "Extract Serial Number",
+              "instructions": "Locate the 'Serial Number', 'Serial No', or 'S/N' column. Extract the manufacturer's serial number for each asset record. If no serial number column exists, record as null."
+            },
+            {
+              "title": "Record Network Operator References",
+              "instructions": "Identify any network operator specific reference codes (e.g., SAP asset number, MAXIMO work order, or network operator asset tag). These are typically in columns labelled 'SAP ID', 'Network Ref', or 'Operator Ref'."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 2,
+          "sub_step_id": "sub-step-extract-asset-classification",
+          "sub_step_name": "Extract Asset Type and Classification",
+          "details": "Extract the asset type, category, and classification from each record. This includes the primary asset class (e.g., Transformer, Switchgear, Cable, Pole) and any sub-classification or asset group.",
+          "instructional_sub_steps": [
+            {
+              "title": "Identify Asset Type Column",
+              "instructions": "Locate the column(s) labelled 'Asset Type', 'Asset Category', 'Equipment Type', 'Asset Class', or 'Description'. Extract the asset type value for each row."
+            },
+            {
+              "title": "Extract Asset Description",
+              "instructions": "Find the 'Description', 'Asset Description', or 'Equipment Description' column. Extract the full descriptive text for each asset record including make, model, and rated specification if combined in the description field."
+            },
+            {
+              "title": "Note Asset Group or Hierarchy",
+              "instructions": "If the spreadsheet contains parent-child asset relationships or asset group columns (e.g., 'Parent Asset', 'Asset Group', 'Functional Location'), extract these to preserve the asset hierarchy context."
+            },
+            {
+              "title": "Extract Superior Functional Location (SFL)",
+              "instructions": "Locate the column labelled 'Superior Function', 'Superior FL', 'Superior Functional Location', 'Functional Location', or 'FLOC'. This column contains the parent asset reference (e.g. 'PO1011307' for a streetlight mounted on that pole, or 'SLP00234567' for a lantern on that column). Extract the raw value exactly as written for each asset record and store it as 'superior_functional_location'. If no such column exists, record as null."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 3,
+          "sub_step_id": "sub-step-extract-asset-location",
+          "sub_step_name": "Extract Asset Location Data",
+          "details": "Extract all location and site information for each asset record, including physical address, substation reference, feeder reference, or geographic coordinates.",
+          "instructional_sub_steps": [
+            {
+              "title": "Extract Address and Site",
+              "instructions": "Locate columns labelled 'Location', 'Address', 'Site', 'Site Name', or 'Suburb'. Extract the physical location for each asset including street address, suburb, or site identifier."
+            },
+            {
+              "title": "Extract Network Location References",
+              "instructions": "Find columns for 'Feeder', 'Feeder ID', 'Substation', 'Zone Substation', 'Pole Reference', 'Span Reference', or 'Circuit'. These define where the asset sits within the electrical network topology."
+            },
+            {
+              "title": "Record GPS or Grid Coordinates",
+              "instructions": "If geographic coordinate columns exist (e.g., 'Latitude', 'Longitude', 'Easting', 'Northing', 'MGA', 'GDA'), extract the coordinate values for each asset."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 4,
+          "sub_step_id": "sub-step-extract-technical-specifications",
+          "sub_step_name": "Extract Technical Specifications",
+          "details": "Extract the technical rating and specification data for each asset including capacity, voltage level, manufacturer, model, and any rated parameters.",
+          "instructional_sub_steps": [
+            {
+              "title": "Extract Capacity and Ratings",
+              "instructions": "Locate columns for 'Capacity', 'Rating', 'kVA', 'MVA', 'Amps', 'Current Rating', or 'Rated Capacity'. Extract the rated capacity with units for each asset. For transformers, capture both primary and secondary voltage ratings if available."
+            },
+            {
+              "title": "Extract Voltage Level",
+              "instructions": "Find the 'Voltage Level', 'Voltage', 'kV', 'HV Voltage', or 'LV Voltage' column. Extract the operating voltage level for each asset expressed in kV or V."
+            },
+            {
+              "title": "Extract Manufacturer and Model",
+              "instructions": "Locate 'Manufacturer', 'Make', 'Brand', 'Model', 'Model Number', or 'Type Number' columns. Extract the manufacturer name and model designation for each asset."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 5,
+          "sub_step_id": "sub-step-extract-condition-status",
+          "sub_step_name": "Extract Condition Ratings and Status",
+          "details": "Extract the current condition rating, asset status (active, retired, proposed), and any maintenance or inspection flags for each asset record.",
+          "instructional_sub_steps": [
+            {
+              "title": "Extract Condition Rating",
+              "instructions": "Locate the 'Condition', 'Condition Rating', 'Condition Score', or 'Asset Health' column. Extract the condition rating for each asset. Condition is often expressed as a numeric score (1–5), a text grade (Good, Fair, Poor), or a percentage health index."
+            },
+            {
+              "title": "Extract Asset Status",
+              "instructions": "Find the 'Status', 'Asset Status', 'Operational Status', or 'Active/Retired' column. Extract the current operational status for each asset (e.g., Active, In-Service, Retired, Proposed, Decommissioned)."
+            },
+            {
+              "title": "Extract Inspection and Maintenance Dates",
+              "instructions": "Locate date columns such as 'Installation Date', 'Commissioned Date', 'Last Inspection', 'Next Inspection', 'Last Maintenance', or 'Replacement Due'. Extract these dates for each asset record."
+            }
+          ]
+        }
+      ],
+      "expected_input": {
+        "description": "The ProcessingPlan from Step 2 indicating which tool to use per document, and the spreadsheet files themselves.",
+        "fields": {
+          "processing_plan": "Array of processing entries from Step 2 output",
+          "documents_folder": "Folder path containing the actual spreadsheet files"
+        }
+      },
+      "expected_output": {
+        "description": "Structured asset records extracted from the spreadsheet, with each record containing all available identification, classification, location, technical, and condition fields.",
+        "fields": {
+          "asset_records": "Array of asset record objects — each with: asset_id, serial_number, asset_type, description, location, address, feeder, voltage_level, capacity_rating, manufacturer, model, condition_rating, status, installation_date, last_inspection_date, superior_functional_location, source_sheet, source_row",
+          "total_assets": "Integer count of extracted asset records",
+          "sheets_processed": "Array of sheet names that were read from the spreadsheet",
+          "source_documents": "Array of spreadsheet filenames that contributed to the extracted asset records"
+        }
+      },
+      "actual_input": {
+        "source": "Automatically passed from Step 2 processing_plan; documents read via tool-extract-spreadsheet-content",
+        "agent_id": "agent-document-extractor",
+        "tool_id": "tool-extract-spreadsheet-content",
+        "endpoint": "POST http://document-extractor:8090/extract"
+      },
+      "actual_output": {
+        "stored_as": "state.results.asset_records",
+        "file_pattern": "OUTPUT/AssetExtract_<timestamp>.json"
+      }
+    },
+    {
+      "step_number": 4,
+      "step_id": "step-validate-pole-worksheet",
+      "step_name": "POLE Worksheet Audit and Validation",
+      "summary": "Perform a structured audit of the POLE tab to verify data presence, clean Functional Location identifiers, and validate mandatory equipment characteristics.",
+      "details": "This step executes specific domain logic for Pole assets. It includes data cleaning for ID matching, format verification for substation hierarchy, and mandatory field completion checks for assembly items.",
+      "sub_steps": [
+        {
+          "sub_step_number": 1,
+          "sub_step_id": "sub-step-pole-initial-audit",
+          "sub_step_name": "Initial Worksheet Audit",
+          "details": "Verify the presence of the POLE tab and confirm it contains data before proceeding.",
+          "instructional_sub_steps": [
+            {
+              "title": "Worksheet Presence & Data Scan",
+              "instructions": "Locate the tab labeled 'POLE'. If the tab is missing or contains no data records, mark as 'No Data' and terminate the POLE validation process. If data is present, proceed."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 2,
+          "sub_step_id": "sub-step-pole-id-extraction",
+          "sub_step_name": "Functional Location & Asset ID Extraction",
+          "details": "Extract and clean identifiers for cross-referencing with Design Drawings.",
+          "instructional_sub_steps": [
+            {
+              "title": "FLOC Cleaning Rule",
+              "instructions": "Extract Functional Location Numbers. Remove all leading letters and zeros for comparison (e.g., convert 'PO0165863' to '165863')."
+            },
+            {
+              "title": "Substation Superior Function Validation",
+              "instructions": "For entries identified as 'Pole Substations', verify the 'Superior Function' field matches the mask 'POLEXXXXXXXXX'."
+            },
+            {
+              "title": "Schedule Consistency Check",
+              "instructions": "Extract asset numbers from the 'POLE SCHEDULE TABLE' and verify consistency against the TAL and design drawings."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 3,
+          "sub_step_id": "sub-step-pole-field-validation",
+          "sub_step_name": "Mandatory Field Completion & Logic",
+          "details": "Check for mandatory data entry and hierarchical integrity between assembly records.",
+          "instructional_sub_steps": [
+            {
+              "title": "Mandatory Field Audit",
+              "instructions": "Ensure the following columns are populated: Special Use Code, EQ Reference Equipment Desc, EQ Technical Object Type, FLOC Technical Object, Location, and Equipment Owner."
+            },
+            {
+              "title": "Assembly & Hierarchy Validation",
+              "instructions": "For every Assembly Number, verify: 1. Superior Functional Location matches the top-tab Functional Location. 2. FLOC Construction Type matches the design environment (Urban, Rural, Semi-Rural, Coastal). 3. Presence of Equipment Number and Technical Object attributes."
+            }
+          ]
+        }
+      ],
+      "expected_input": {
+        "description": "The extracted data from the POLE worksheet and the associated Design Drawings/TAL for cross-referencing.",
+        "fields": {
+          "worksheet_name": "POLE",
+          "design_reference": "Design Drawing / TAL data"
+        }
+      },
+      "expected_output": {
+        "description": "A validation report for Pole assets highlighting missing fields, ID mismatches, and hierarchy errors.",
+        "fields": {
+          "validation_status": "Pass/Fail/No Data",
+          "cleaned_floc_ids": "Array of numeric-only IDs",
+          "validation_errors": "List of missing mandatory fields or hierarchy mismatches"
+        }
+      },
+      "actual_input": {
+        "source": "Output from Step 3 filtered for POLE tab",
+        "agent_id": "agent-document-extractor",
+        "tool_id": "tool-validate-pole-logic"
+      },
+      "actual_output": {
+        "stored_as": "state.results.pole_validation",
+        "file_pattern": "OUTPUT/PoleValidation_<timestamp>.json"
+      }
+    }
+  ],
+  "consolidated_output": {
+    "description": "A single consolidated JSON combining all asset records extracted from all matched spreadsheet files in the document package.",
+    "file_pattern": "OUTPUT/AssetSpreadsheetReport_<timestamp>.json",
+    "structure": {
+      "process_id": "proc-extract-asset-spreadsheet",
+      "run_timestamp": "ISO8601 datetime",
+      "source_documents": [],
+      "total_assets": 0,
+      "asset_records": [
+        {
+          "asset_id": null,
+          "serial_number": null,
+          "asset_type": null,
+          "description": null,
+          "location": null,
+          "address": null,
+          "feeder": null,
+          "voltage_level": null,
+          "capacity_rating": null,
+          "manufacturer": null,
+          "model": null,
+          "condition_rating": null,
+          "status": null,
+          "installation_date": null,
+          "last_inspection_date": null,
+          "superior_functional_location": null,
+          "source_sheet": null,
+          "source_document": null
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,8 @@
+﻿{
+  "document_list": ["DS1_DAR1675_RETIC.pdf"],
+  "document_config": {"document_category": "Site Plan", "requires_chunking": true},
+  "num_runs": 3,
+  "steps_to_run": ["Extract Site Plan Information"],
+  "validate_step": "Extract Site Plan Information",
+  "generate_variance_report": true
+}

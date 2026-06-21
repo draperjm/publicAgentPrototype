@@ -1,0 +1,20 @@
+{
+  "plan_overview": "Step 7 Multi-Run Variance Test - Extract Asset Spreadsheet (TAL) with 2 consecutive runs for consistency testing",
+  "steps": [
+    {
+      "step_number": 7,
+      "description": "Extract asset spreadsheet with multi-run variance testing. Execute 2 times with identical input to verify consistency.",
+      "name": "ExtractAssetSpreadsheet",
+      "assigned_resource_id": "document_extractor_01",
+      "required_resources": {
+        "agent_id": "document-extractor",
+        "knowledge_id": "proc-extract-asset-spreadsheet"
+      },
+      "repeat_runs": 2,
+      "validation": {
+        "criteria": "Multi-run consistency test: verify asset record count and field structure consistency across 2 runs",
+        "critical_fail": false
+      }
+    }
+  ]
+}
