@@ -1,0 +1,2069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent Workflow</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%22 height=%2232%22 rx=%226%22 fill=%22%23161616%22/%3E%3Crect x=%228%22 y=%2210%22 width=%2216%22 height=%2212%22 rx=%223%22 fill=%22none%22 stroke=%22%234d9fff%22 stroke-width=%222%22/%3E%3Ccircle cx=%2212%22 cy=%2216%22 r=%221.5%22 fill=%22%234d9fff%22/%3E%3Ccircle cx=%2220%22 cy=%2216%22 r=%221.5%22 fill=%22%234d9fff%22/%3E%3Crect x=%2214%22 y=%227%22 width=%224%22 height=%223%22 rx=%221%22 fill=%22%234d9fff%22/%3E%3C/svg%3E">
+    <!-- Auth guard: redirect to login if no valid session -->
+    <script>(function(){
+        try {
+            var a = JSON.parse(sessionStorage.getItem('agent_auth')||'null');
+            if (!a || !a.exp || Date.now()/1000 >= a.exp) {
+                sessionStorage.removeItem('agent_auth');
+                window.location.replace('/login.html');
+            }
+        } catch(e) { window.location.replace('/login.html'); }
+    })();</script>
+    <script>(function(){if(localStorage.getItem('theme')==='light')document.documentElement.classList.add('light');})()</script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        :root {
+            --bg: #161616;
+            --canvas-bg: #1b1b1b;
+            --node-bg: #252525;
+            --node-border: rgba(255,255,255,0.1);
+            --text: #d4d4d4;
+            --text-dim: #888;
+            --text-muted: #555;
+            --panel-bg: #1e1e1e;
+            --panel-border: rgba(255,255,255,0.08);
+            --header-bg: #141414;
+            --header-h: 52px;
+            --sidebar-w: 400px;
+            --status-pending: #555;
+            --status-active: #f59e0b;
+            --status-done: #22c55e;
+            --status-error: #ef4444;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* ── HEADER ── */
+        .app-header { height: var(--header-h); background: var(--header-bg); border-bottom: 1px solid var(--panel-border); display: flex; align-items: center; padding: 0 16px; gap: 10px; flex-shrink: 0; z-index: 100; }
+        .header-brand { font-size: 0.88rem; font-weight: 700; white-space: nowrap; padding-right: 12px; border-right: 1px solid var(--panel-border); }
+        .header-brand span { color: #4d9fff; }
+        .task-wrap { display: flex; align-items: stretch; background: #242424; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden; flex: 1; max-width: 400px; }
+        .task-wrap select { background: transparent; border: none; color: var(--text); padding: 7px 10px; font-size: 0.82rem; flex: 1; outline: none; cursor: pointer; min-width: 0; }
+        .task-wrap select option { background: #242424; }
+        .btn-cog { background: transparent; border: none; border-left: 1px solid rgba(255,255,255,0.08); color: var(--text-muted); padding: 0 10px; cursor: pointer; font-size: 1rem; transition: color .15s, background .15s; }
+        .btn-cog:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+        .hbtn { padding: 7px 14px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem; transition: background .15s, opacity .15s; white-space: nowrap; }
+        .hbtn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .hbtn-blue { background: #2563eb; color: white; } .hbtn-blue:hover:not(:disabled) { background: #1d4ed8; }
+        .hbtn-green { background: #16a34a; color: white; display: none; } .hbtn-green:hover:not(:disabled) { background: #15803d; }
+        .hbtn-purple { padding: 7px 14px; border-radius: 6px; font-weight: 600; font-size: 0.8rem; background: #6d28d9; color: white; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: background .15s; } .hbtn-purple:hover { background: #5b21b6; }
+        .header-sep { width: 1px; height: 24px; background: var(--panel-border); flex-shrink: 0; }
+        #headerStatus { margin-left: auto; font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
+        #headerStatus.live { color: var(--status-active); }
+        #headerStatus.done { color: var(--status-done); }
+
+        /* ── BODY ── */
+        .app-body { flex: 1; display: flex; overflow: hidden; }
+
+        /* ── CANVAS ── */
+        .canvas-wrap { flex: 1; overflow: hidden; position: relative; background: var(--canvas-bg); cursor: grab; }
+        .canvas-wrap.panning { cursor: grabbing; }
+        .canvas-wrap::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px); background-size: 22px 22px; pointer-events: none; z-index: 0; }
+        .canvas-inner { position: absolute; transform-origin: 0 0; }
+        .edges-svg { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+        #nodeContainer { position: absolute; top: 0; left: 0; }
+        @keyframes edge-march      { to { stroke-dashoffset: -28; } }
+        @keyframes edge-march-slow { to { stroke-dashoffset: -18; } }
+        .edge-anim      { stroke-dasharray: 10 5; animation: edge-march 0.55s linear infinite; }
+        .edge-anim-slow { stroke-dasharray: 6 4;  animation: edge-march-slow 0.9s linear infinite; }
+
+        /* ── NODES ── */
+        .node { position: absolute; width: 280px; background: var(--node-bg); border: 1px solid var(--node-border); border-radius: 8px; overflow: hidden; transition: border-color .2s, box-shadow .2s; user-select: none; cursor: pointer; z-index: 10; }
+        .node:hover { border-color: rgba(255,255,255,0.22); }
+        .node.sel { border-color: #4d9fff; box-shadow: 0 0 0 2px rgba(77,159,255,0.2); }
+        .node.st-active { border-color: var(--status-active); box-shadow: 0 0 0 2px rgba(245,158,11,0.15); }
+        .node.st-skipped { opacity: 0.45; }
+        .node.st-running { border-color: var(--status-active); animation: npulse 1.5s infinite; }
+        .node.st-completed { border-color: rgba(34,197,94,0.35); }
+        .node.st-error { border-color: var(--status-error); }
+        @keyframes npulse { 0%,100% { box-shadow: 0 0 0 2px rgba(245,158,11,0.15); } 50% { box-shadow: 0 0 14px rgba(245,158,11,0.45); } }
+        .node-hdr { height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border-bottom: 1px solid rgba(0,0,0,0.35); }
+        .node-icon { font-size: 0.88rem; flex-shrink: 0; }
+        .node-title { font-size: 0.76rem; font-weight: 700; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: rgba(255,255,255,0.9); }
+        .node-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; transition: background .3s; }
+        .node-dot.pending { background: var(--text-muted); }
+        .node-dot.active, .node-dot.running { background: var(--status-active); }
+        .node-dot.completed { background: var(--status-done); }
+        .node-dot.error { background: var(--status-error); }
+        .node-body { padding: 0; }
+        .node-sub { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: 3px; }
+        .node-desc { font-size: 0.71rem; color: #909090; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .node-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 4px; }
+        .node-tag { font-size: 0.6rem; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-dim); border: 1px solid rgba(255,255,255,0.07); display: flex; align-items: center; gap: 3px; }
+        .node-tag.crit { background: rgba(239,68,68,0.12); color: #fca5a5; border-color: rgba(239,68,68,0.25); }
+        .node-foot { font-size: 0.67rem; padding: 4px 10px; border-top: 1px solid rgba(255,255,255,0.05); color: var(--text-muted); display: flex; align-items: center; justify-content: space-between; gap: 5px; }
+        .node-enable-chk { display: flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
+        .node-enable-chk input[type=checkbox] { accent-color: #3b82f6; width: 11px; height: 11px; cursor: pointer; }
+        .node-rerun-btn { font-size: 0.62rem; padding: 2px 7px; border-radius: 4px; border: 1px solid rgba(251,191,36,0.35); background: rgba(251,191,36,0.1); color: #fbbf24; cursor: pointer; transition: background .15s; }
+        .node-rerun-btn:hover { background: rgba(251,191,36,0.22); }
+        /* ── NODE CARD SECTIONS ── */
+        .node-section { padding: 5px 10px; border-top: 1px solid rgba(255,255,255,0.05); }
+        .node-section:first-child { border-top: none; padding-top: 7px; }
+        .node-section:last-child { padding-bottom: 7px; }
+        .node-lbl { font-size: 0.55rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #4d9fff; margin-bottom: 2px; }
+        .node-val { font-size: 0.69rem; color: #c8c8c8; line-height: 1.3; }
+        .node-res-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 0.6rem; padding: 2px 7px; border-radius: 10px; font-family: 'Courier New', monospace; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .chip-agent { background: rgba(77,159,255,0.12); color: #7ab8ff; border: 1px solid rgba(77,159,255,0.22); }
+        .chip-tool  { background: rgba(168,85,247,0.12); color: #c084fc; border: 1px solid rgba(168,85,247,0.22); }
+        .chip-kb    { background: rgba(251,191,36,0.12); color: #fcd34d; border: 1px solid rgba(251,191,36,0.22); }
+        .node-model-badge { margin-top: 4px; font-size: 0.55rem; color: #6b7280; font-family: 'Courier New', monospace; }
+        .node-parallel-badge { margin-left: auto; font-size: 0.58rem; font-weight: 700; padding: 1px 6px; border-radius: 8px; background: rgba(99,202,183,0.18); color: #63cab7; border: 1px solid rgba(99,202,183,0.35); white-space: nowrap; letter-spacing: 0.02em; }
+        .node-io-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-top: 1px solid rgba(255,255,255,0.05); }
+        .node-io-cell { padding: 5px 10px; }
+        .node-io-cell:first-child { border-right: 1px solid rgba(255,255,255,0.05); }
+        .node-crit-row { padding: 3px 10px; background: rgba(239,68,68,0.08); border-top: 1px solid rgba(239,68,68,0.2); }
+        .node-crit-lbl { font-size: 0.6rem; color: #fca5a5; display: flex; align-items: center; gap: 3px; }
+        .node-foot.active, .node-foot.running { color: var(--status-active); }
+        .node-foot.completed { color: var(--status-done); }
+        .node-foot.error { color: var(--status-error); }
+        .node-out-btn { font-size: 0.63rem; padding: 2px 7px; background: rgba(77,159,255,0.1); border: 1px solid rgba(77,159,255,0.2); border-radius: 4px; color: #4d9fff; cursor: pointer; margin-top: 3px; display: inline-flex; align-items: center; gap: 2px; transition: background .15s; }
+        .node-out-btn:hover { background: rgba(77,159,255,0.2); }
+        .node-out-body { margin-top: 5px; background: rgba(0,0,0,0.45); color: #4ade80; font-family: 'Courier New', monospace; font-size: 0.63rem; padding: 6px; border-radius: 4px; max-height: 90px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; border: 1px solid rgba(255,255,255,0.05); }
+
+        /* Port dots */
+        .port { position: absolute; width: 11px; height: 11px; border-radius: 50%; background: #333; border: 2px solid #4a4a4a; z-index: 20; }
+        .port-in  { left: -6px; }
+        .port-out { right: -6px; }
+        .port.done { background: #22c55e; border-color: #22c55e; }
+
+        /* Val node */
+        .val-node { width: 220px; }
+        .val-node .node-hdr { height: 28px; }
+        .val-node .node-title { font-size: 0.7rem; }
+
+        /* Canvas controls */
+        .canvas-ctrls { position: absolute; bottom: 14px; right: 14px; display: flex; gap: 5px; z-index: 50; }
+        .canvas-ctrl { width: 30px; height: 30px; background: rgba(22,22,22,0.9); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: var(--text); font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s; }
+        .canvas-ctrl:hover { background: rgba(45,45,45,0.95); }
+        .canvas-hint { position: absolute; bottom: 14px; left: 14px; font-size: 0.65rem; color: var(--text-muted); z-index: 50; pointer-events: none; }
+        .canvas-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.82rem; pointer-events: none; z-index: 5; gap: 10px; }
+        .canvas-empty-icon { font-size: 2.2rem; opacity: 0.3; }
+        .canvas-empty-text { opacity: 0.4; }
+
+        /* ── SIDEBAR ── */
+        .sidebar { width: var(--sidebar-w); background: var(--panel-bg); border-left: 1px solid var(--panel-border); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; }
+        .s-tabs { display: flex; border-bottom: 1px solid var(--panel-border); background: var(--header-bg); flex-shrink: 0; }
+        .s-tab { flex: 1; padding: 10px 6px; font-size: 0.72rem; font-weight: 600; text-align: center; cursor: pointer; border: none; background: transparent; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .15s; white-space: nowrap; }
+        .s-tab.active { color: #4d9fff; border-bottom-color: #4d9fff; }
+        .s-tab:hover:not(.active) { color: var(--text-dim); }
+        .s-panel { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+        .tab-c { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+        .tab-c.active { display: flex; }
+        .logs-body { background: #0d1117; color: #4ade80; font-family: 'Courier New', monospace; font-size: 0.73rem; padding: 12px; flex: 1; overflow-y: auto; white-space: pre-wrap; line-height: 1.5; }
+        .out-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .s-selector { padding: 9px 12px; border-bottom: 1px solid var(--panel-border); display: flex; align-items: center; gap: 8px; background: var(--header-bg); flex-shrink: 0; }
+        .s-selector label { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+        .s-selector select { flex: 1; padding: 5px 8px; border: 1px solid rgba(255,255,255,0.1); border-radius: 5px; font-size: 0.72rem; background: #2a2a2a; color: var(--text); outline: none; }
+        .s-selector select option { background: #2a2a2a; }
+        .out-body { background: #0d1117; color: #e2e8f0; font-family: 'Courier New', monospace; font-size: 0.7rem; padding: 12px; flex: 1; overflow-y: auto; white-space: pre-wrap; line-height: 1.5; word-break: break-all; }
+        .out-body .key { color: #93c5fd; } .out-body .string { color: #86efac; } .out-body .number { color: #fbbf24; } .out-body .null { color: #555; }
+        .empty-msg { color: #555; font-size: 0.78rem; padding: 2rem; text-align: center; font-family: -apple-system,sans-serif; }
+
+        /* Tests tab */
+        .test-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .test-body { flex: 1; overflow-y: auto; padding: 10px; background: var(--panel-bg); }
+        .tsumm { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 6px; margin-bottom: 8px; }
+        .tsumm.pass { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); }
+        .tsumm.fail { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); }
+        .tsumm-res { font-size: 0.88rem; font-weight: 700; }
+        .tsumm-res.pass { color: #22c55e; } .tsumm-res.fail { color: #ef4444; }
+        .tsumm-stats { display: flex; gap: 6px; flex: 1; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+        .tstat { font-size: 0.65rem; font-weight: 600; padding: 2px 7px; border-radius: 9999px; }
+        .tstat.total { background: rgba(255,255,255,0.07); color: var(--text-dim); }
+        .tstat.passed { background: rgba(34,197,94,0.12); color: #22c55e; }
+        .tstat.failed { background: rgba(239,68,68,0.12); color: #ef4444; }
+        .tstat.score  { background: rgba(77,159,255,0.12); color: #4d9fff; }
+        .tsumm-text { font-size: 0.72rem; color: var(--text-dim); margin-bottom: 8px; line-height: 1.5; }
+        .tc-card { border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; margin-bottom: 5px; overflow: hidden; }
+        .tc-card.pass { border-left: 3px solid #22c55e; } .tc-card.fail { border-left: 3px solid #ef4444; }
+        .tc-hdr { display: flex; align-items: center; gap: 6px; padding: 6px 10px; cursor: pointer; user-select: none; background: rgba(255,255,255,0.02); transition: background .15s; }
+        .tc-hdr:hover { background: rgba(255,255,255,0.05); }
+        .tc-icon { width: 17px; height: 17px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.58rem; color: white; flex-shrink: 0; }
+        .tc-icon.pass { background: #22c55e; } .tc-icon.fail { background: #ef4444; }
+        .tc-id { font-size: 0.62rem; font-weight: 700; color: var(--text-muted); font-family: monospace; flex-shrink: 0; }
+        .tc-name { font-size: 0.72rem; font-weight: 600; color: var(--text); flex: 1; }
+        .tc-cat { font-size: 0.58rem; font-weight: 700; padding: 1px 6px; border-radius: 9999px; text-transform: uppercase; letter-spacing: .04em; flex-shrink: 0; }
+        .tc-cat.completeness { background: rgba(77,159,255,0.12); color: #4d9fff; }
+        .tc-cat.correctness  { background: rgba(245,158,11,0.12); color: #f59e0b; }
+        .tc-cat.format       { background: rgba(139,92,246,0.12); color: #a78bfa; }
+        .tc-cat.consistency  { background: rgba(168,85,247,0.12); color: #c084fc; }
+        .tc-cat.data_integrity { background: rgba(20,184,166,0.12); color: #2dd4bf; }
+        .tc-chev { font-size: 0.6rem; color: var(--text-muted); transition: transform .2s; flex-shrink: 0; }
+        .tc-chev.open { transform: rotate(180deg); }
+        .tc-body { display: none; padding: 8px 10px; border-top: 1px solid rgba(255,255,255,0.05); background: rgba(0,0,0,0.18); font-size: 0.7rem; line-height: 1.5; }
+        .tc-body.open { display: block; }
+        .tc-field { margin-bottom: 5px; }
+        .tc-flabel { font-size: 0.6rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
+        .tc-fval { color: var(--text); word-break: break-word; }
+        .tc-fval.expected { color: #60a5fa; } .tc-fval.actual { color: #4ade80; } .tc-fval.actual.mismatch { color: #f87171; }
+        .tc-reason { color: var(--text-dim); font-size: 0.68rem; line-height: 1.5; background: rgba(0,0,0,0.3); padding: 5px 7px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); }
+        .tfiles { margin-bottom: 7px; border: 1px solid rgba(255,255,255,0.07); border-radius: 5px; overflow: hidden; }
+        .tfiles-hdr { display: flex; align-items: center; gap: 5px; padding: 5px 9px; background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .tfiles-title { font-size: 0.62rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+        .tfiles-body { padding: 6px 9px; }
+        .tfile { display: flex; align-items: center; gap: 4px; padding: 3px 5px; border-radius: 3px; font-size: 0.67rem; margin-bottom: 2px; }
+        .tfile.input  { background: rgba(77,159,255,0.07); border: 1px solid rgba(77,159,255,0.12); }
+        .tfile.output { background: rgba(34,197,94,0.07);  border: 1px solid rgba(34,197,94,0.12);  }
+        .tfile.report { background: rgba(139,92,246,0.07); border: 1px solid rgba(139,92,246,0.12); }
+        .tfile-name { font-weight: 600; color: var(--text); font-family: monospace; font-size: 0.64rem; }
+        .tfile-role { font-size: 0.58rem; font-weight: 600; padding: 1px 5px; border-radius: 9999px; text-transform: uppercase; flex-shrink: 0; }
+        .tfile-role.input  { background: rgba(77,159,255,0.12); color: #4d9fff; }
+        .tfile-role.output { background: rgba(34,197,94,0.12);  color: #22c55e; }
+        .tfile-role.report { background: rgba(139,92,246,0.12); color: #a78bfa; }
+        .tfile-ing { font-size: 0.55rem; padding: 1px 4px; border-radius: 3px; font-weight: 600; flex-shrink: 0; }
+        .tfile-ing.yes { background: rgba(34,197,94,0.12); color: #22c55e; }
+        .tfile-ing.no  { background: rgba(239,68,68,0.12); color: #ef4444; }
+        .tfile-sz { font-size: 0.6rem; color: #555; margin-left: auto; }
+        .t-issues { margin-top: 7px; padding: 7px 9px; border-radius: 5px; background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.18); }
+        .t-recs   { margin-top: 6px; padding: 7px 9px; border-radius: 5px; background: rgba(77,159,255,0.07); border: 1px solid rgba(77,159,255,0.18); }
+        .t-sec-title { font-size: 0.62rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 3px; }
+        .t-sec-item { font-size: 0.7rem; padding: 2px 0; line-height: 1.5; }
+        .t-sec-item.issue { color: #fca5a5; } .t-sec-item.rec { color: #93c5fd; }
+
+        /* ── SERVICES TAB ── */
+        .svc-body { flex: 1; overflow-y: auto; padding: 10px; background: var(--panel-bg); }
+        .svc-card { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 7px; margin-bottom: 7px; border: 1px solid rgba(255,255,255,0.07); background: rgba(255,255,255,0.02); }
+        .svc-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--text-muted); transition: background .3s; }
+        .svc-dot.running { background: var(--status-done); }
+        .svc-dot.exited  { background: var(--status-error); }
+        .svc-dot.loading { background: var(--status-active); animation: npulse 1.2s infinite; }
+        .svc-label { font-size: 0.74rem; font-weight: 600; color: var(--text); flex: 1; }
+        .svc-status { font-size: 0.63rem; color: var(--text-muted); min-width: 52px; text-align: right; }
+        .svc-btns { display: flex; gap: 5px; }
+        .svc-btn { padding: 3px 9px; font-size: 0.63rem; font-weight: 600; border: none; border-radius: 5px; cursor: pointer; transition: background .15s, opacity .15s; }
+        .svc-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .svc-btn.run-step { background: rgba(37,99,235,0.15); color: #60a5fa; border: 1px solid rgba(37,99,235,0.35); }
+        .svc-btn.run-step:hover:not(:disabled) { background: rgba(37,99,235,0.28); }
+        .svc-btn.restart { background: rgba(77,159,255,0.12); color: #7ab8ff; border: 1px solid rgba(77,159,255,0.25); }
+        .svc-btn.restart:hover:not(:disabled) { background: rgba(77,159,255,0.24); }
+        .svc-refresh { display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 0 4px 6px; }
+        .svc-refresh-btn { font-size: 0.65rem; color: var(--text-muted); background: none; border: none; cursor: pointer; padding: 3px 6px; border-radius: 4px; transition: color .15s, background .15s; }
+        .svc-refresh-btn:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+        .svc-run-btn { font-size: 0.7rem; font-weight: 600; color: #fff; background: #2563eb; border: none; cursor: pointer; padding: 4px 10px; border-radius: 5px; transition: background .15s; }
+        .svc-run-btn:hover { background: #1d4ed8; }
+
+        /* ── CONFIG OVERLAY ── */
+        .cfg-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 200; align-items: center; justify-content: center; }
+        .cfg-overlay.open { display: flex; }
+        .cfg-panel { background: #1e1e1e; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; width: 520px; max-height: 82vh; overflow-y: auto; box-shadow: 0 24px 60px rgba(0,0,0,0.6); display: flex; flex-direction: column; }
+        .cfg-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.07); background: #1a1a1a; border-radius: 10px 10px 0 0; flex-shrink: 0; position: sticky; top: 0; z-index: 1; }
+        .cfg-head h2 { font-size: 0.95rem; font-weight: 700; }
+        .cfg-close { width: 27px; height: 27px; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 5px; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; transition: background .15s, color .15s; }
+        .cfg-close:hover { background: rgba(255,255,255,0.07); color: var(--text); }
+        .cfg-body { padding: 18px 20px; flex: 1; overflow-y: auto; }
+        .cfg-section { margin-bottom: 18px; }
+        .cfg-sec-title { font-size: 0.67rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 5px; }
+        .cfg-field { margin-bottom: 10px; }
+        .cfg-label { font-size: 0.72rem; font-weight: 600; color: var(--text-dim); margin-bottom: 4px; display: block; }
+        .cfg-input, .cfg-textarea { width: 100%; background: #2a2a2a; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: var(--text); padding: 7px 10px; font-size: 0.78rem; font-family: inherit; outline: none; transition: border-color .15s; }
+        .cfg-input:focus, .cfg-textarea:focus { border-color: rgba(77,159,255,0.5); }
+        .cfg-input[readonly] { opacity: 0.6; cursor: default; }
+        .cfg-textarea { min-height: 65px; resize: vertical; line-height: 1.4; }
+        .step-cfg-card { background: #232323; border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; margin-bottom: 7px; overflow: hidden; }
+        .step-cfg-hdr { display: flex; align-items: center; gap: 7px; padding: 8px 11px; cursor: pointer; user-select: none; background: rgba(255,255,255,0.02); transition: background .15s; }
+        .step-cfg-hdr:hover { background: rgba(255,255,255,0.05); }
+        .step-cfg-num { width: 21px; height: 21px; border-radius: 50%; background: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; color: white; flex-shrink: 0; }
+        .step-cfg-name { font-size: 0.78rem; font-weight: 600; flex: 1; }
+        .step-cfg-chev { font-size: 0.62rem; color: var(--text-muted); transition: transform .2s; }
+        .step-cfg-chev.open { transform: rotate(180deg); }
+        .step-cfg-body { display: none; padding: 10px 11px; border-top: 1px solid rgba(255,255,255,0.05); }
+        .step-cfg-body.open { display: block; }
+        .cfg-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .cfg-foot { padding: 14px 20px; border-top: 1px solid rgba(255,255,255,0.07); background: #1a1a1a; border-radius: 0 0 10px 10px; display: flex; justify-content: flex-end; gap: 7px; flex-shrink: 0; }
+        .cfg-btn { padding: 7px 15px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.78rem; transition: background .15s; }
+        .cfg-cancel { background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid rgba(255,255,255,0.1); }
+        .cfg-cancel:hover { background: rgba(255,255,255,0.09); }
+        .cfg-apply  { background: #2563eb; color: white; }
+        .cfg-apply:hover { background: #1d4ed8; }
+
+        /* ── UPLOAD MODAL ── */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; z-index: 300; }
+        .modal-overlay.open { display: flex; }
+        .modal { background: #1e1e1e; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; width: 390px; padding: 22px; box-shadow: 0 24px 60px rgba(0,0,0,0.6); }
+        .modal h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 6px; }
+        .modal p  { color: var(--text-dim); font-size: 0.82rem; margin-bottom: 14px; line-height: 1.5; }
+        .modal input[type="file"] { display: block; width: 100%; margin-bottom: 14px; color: var(--text); font-size: 0.78rem; background: #2a2a2a; border: 1px dashed rgba(255,255,255,0.14); border-radius: 6px; padding: 10px; cursor: pointer; }
+        .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+        .modal-actions button { padding: 7px 15px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.78rem; }
+        .m-cancel  { background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid rgba(255,255,255,0.1); }
+        .m-confirm { background: #2563eb; color: white; }
+
+        /* User avatar in header */
+        .user-avatar-btn { display: flex; align-items: center; gap: 7px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 3px 10px 3px 4px; cursor: pointer; transition: background .15s; flex-shrink: 0; }
+        .user-avatar-btn:hover { background: rgba(255,255,255,0.09); }
+        .user-avatar-btn img { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; }
+        .user-avatar-btn span { font-size: 0.72rem; color: var(--text-dim); max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .logout-btn { background: transparent; border: none; color: #555; font-size: 0.72rem; cursor: pointer; padding: 3px 6px; border-radius: 4px; transition: color .15s; }
+        .logout-btn:hover { color: #ef4444; }
+
+        /* ── WORKER BADGE ── */
+        .worker-badge { display: none; align-items: center; gap: 7px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); border-radius: 8px; padding: 4px 11px 4px 7px; flex-shrink: 0; }
+        .worker-badge.show { display: flex; }
+        .worker-badge-icon { font-size: 1.3rem; line-height: 1; }
+        .worker-badge-label { display: flex; flex-direction: column; }
+        .worker-badge-role { font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+        .worker-badge-name { font-size: 0.75rem; font-weight: 700; color: rgba(255,255,255,0.88); white-space: nowrap; }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+
+        /* ── DOCUMENT REVIEW OUTPUT ── */
+        .dr-wrap { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 10px; background: var(--panel-bg); }
+        .dr-stat-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+        .dr-stat { font-size: 0.65rem; font-weight: 600; padding: 3px 9px; border-radius: 9999px; }
+        .dr-stat.scanned  { background: rgba(255,255,255,0.07); color: var(--text-dim); }
+        .dr-stat.matched  { background: rgba(34,197,94,0.12); color: #22c55e; }
+        .dr-stat.identified { background: rgba(77,159,255,0.12); color: #4d9fff; }
+        .dr-section-title { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin: 12px 0 6px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 4px; }
+        .dr-doc-card { border: 1px solid rgba(255,255,255,0.08); border-left: 3px solid #22c55e; border-radius: 6px; margin-bottom: 7px; padding: 9px 11px; background: rgba(34,197,94,0.04); }
+        .dr-doc-name { font-family: 'Courier New', monospace; font-size: 0.73rem; font-weight: 700; color: #e2e8f0; margin-bottom: 5px; word-break: break-all; }
+        .dr-doc-pills { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; align-items: center; }
+        .dr-badge { font-size: 0.6rem; font-weight: 700; padding: 2px 7px; border-radius: 9999px; background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.25); white-space: nowrap; }
+        .dr-badge.dim { background: rgba(255,255,255,0.04); color: #555; border-color: rgba(255,255,255,0.07); }
+        .dr-quality { font-size: 0.6rem; font-weight: 700; padding: 2px 7px; border-radius: 9999px; white-space: nowrap; }
+        .dr-quality.high   { background: rgba(34,197,94,0.15);  color: #22c55e;  border: 1px solid rgba(34,197,94,0.3); }
+        .dr-quality.medium { background: rgba(245,158,11,0.15); color: #f59e0b;  border: 1px solid rgba(245,158,11,0.3); }
+        .dr-quality.low    { background: rgba(239,68,68,0.15);  color: #ef4444;  border: 1px solid rgba(239,68,68,0.3); }
+        .dr-meta { display: flex; flex-direction: column; gap: 2px; }
+        .dr-meta-row { display: flex; gap: 6px; font-size: 0.67rem; line-height: 1.4; }
+        .dr-meta-key { color: var(--text-muted); font-weight: 600; min-width: 80px; flex-shrink: 0; }
+        .dr-meta-val { color: var(--text-dim); }
+        .dr-scan-row { display: flex; align-items: center; gap: 8px; padding: 5px 9px; border-radius: 5px; margin-bottom: 4px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); font-size: 0.68rem; }
+        .dr-scan-name { font-family: 'Courier New', monospace; font-size: 0.67rem; color: #d4d4d4; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .dr-scan-size { color: #555; font-size: 0.62rem; white-space: nowrap; flex-shrink: 0; }
+        .dr-scan-match { font-size: 0.65rem; font-weight: 700; flex-shrink: 0; }
+        .dr-scan-match.yes { color: #22c55e; }
+        .dr-scan-match.no  { color: #444; }
+        .dr-conf { font-size: 0.6rem; color: #555; flex-shrink: 0; }
+        .dr-ctype { font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 9999px; white-space: nowrap; flex-shrink: 0; }
+        .dr-ctype.text        { background: rgba(34,197,94,0.12);  color: #22c55e;  border: 1px solid rgba(34,197,94,0.25); }
+        .dr-ctype.text-low    { background: rgba(245,158,11,0.12); color: #f59e0b;  border: 1px solid rgba(245,158,11,0.25); }
+        .dr-ctype.image       { background: rgba(239,68,68,0.12);  color: #ef4444;  border: 1px solid rgba(239,68,68,0.25); }
+        .dr-ctype.unsupported { background: rgba(255,255,255,0.05); color: #555;    border: 1px solid rgba(255,255,255,0.08); }
+        .dr-ctype.error       { background: rgba(239,68,68,0.08);  color: #f87171; border: 1px solid rgba(239,68,68,0.15); }
+        .dr-reader { font-size: 0.58rem; font-weight: 600; padding: 1px 5px; border-radius: 3px; background: rgba(77,159,255,0.1); color: #60a5fa; border: 1px solid rgba(77,159,255,0.2); white-space: nowrap; flex-shrink: 0; font-family: monospace; }
+        .dr-reader.ocr { background: rgba(239,68,68,0.1); color: #fca5a5; border-color: rgba(239,68,68,0.2); }
+        .dr-quality-note { font-size: 0.62rem; color: var(--text-muted); margin-top: 5px; line-height: 1.4; padding: 4px 6px; background: rgba(0,0,0,0.2); border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); }
+        /* ── THEME TOGGLE BUTTON ── */
+        .theme-toggle-btn { background: transparent; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-dim); cursor: pointer; font-size: 0.9rem; padding: 5px 9px; line-height: 1; transition: background .15s, border-color .15s; flex-shrink: 0; }
+        .theme-toggle-btn:hover { background: rgba(128,128,128,0.12); border-color: rgba(128,128,128,0.3); }
+    </style>
+    <style>
+        /* ── LIGHT MODE ── */
+        html.light {
+            color-scheme: light;
+            --bg: #f1f2f4;
+            --canvas-bg: #e8eaed;
+            --node-bg: #ffffff;
+            --node-border: rgba(0,0,0,0.1);
+            --card-bg: #f7f7f9;
+            --text: #18181b;
+            --text-dim: #4a4c54;
+            --text-muted: #6b7280;
+            --panel-bg: #f7f7f9;
+            --panel-border: rgba(0,0,0,0.09);
+            --header-bg: #eaeaee;
+            --accent: #2563eb;
+            --blue: #2563eb;
+            --blue-dark: #1e40af;
+            --green: #16a34a;
+            --amber: #d97706;
+            --red: #dc2626;
+            --purple: #7c3aed;
+            --teal: #0d9488;
+            --status-pending: #9ca3af;
+            --status-active: #d97706;
+            --status-done: #16a34a;
+            --status-error: #dc2626;
+        }
+        /* Canvas */
+        html.light .canvas-wrap::before { background-image: radial-gradient(circle, rgba(0,0,0,0.15) 1px, transparent 1px); }
+        /* Nodes */
+        html.light .node { background: #ffffff; border-color: rgba(0,0,0,0.12); }
+        html.light .node:hover { border-color: rgba(0,0,0,0.3); }
+        html.light .node.st-completed { border-color: rgba(34,197,94,0.5); }
+        html.light .node-desc { color: #4b5563; }
+        html.light .node-val { color: #374151; }
+        html.light .node-section { border-top-color: rgba(0,0,0,0.07); }
+        html.light .node-io-grid { border-top-color: rgba(0,0,0,0.07); }
+        html.light .node-io-cell:first-child { border-right-color: rgba(0,0,0,0.07); }
+        html.light .node-foot { border-top-color: rgba(0,0,0,0.07); }
+        html.light .node-tag { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.09); }
+        html.light .node-out-body { background: #f0f2f5; color: #166534; border-color: rgba(0,0,0,0.1); }
+        html.light .port { background: #b0b4be; border-color: #9094a0; }
+        /* Header controls */
+        html.light .task-wrap { background: #ffffff; border-color: rgba(0,0,0,0.12); }
+        html.light .task-wrap select option { background: #ffffff; color: #18181b; }
+        /* Canvas controls */
+        html.light .canvas-ctrl { background: rgba(240,241,245,0.97); border-color: rgba(0,0,0,0.14); color: #374151; }
+        html.light .canvas-ctrl:hover { background: rgba(220,222,230,1); }
+        /* Console log */
+        html.light .clog-wrap { background: #f7f7f9; border-color: rgba(0,0,0,0.09); }
+        html.light .clog { color: #374151; }
+        /* Sidebar selector */
+        html.light .s-selector select { background: #ffffff; border-color: rgba(0,0,0,0.12); color: #18181b; }
+        html.light .s-selector select option { background: #ffffff; }
+        /* Output/log panels */
+        html.light .logs-body { background: #f0f4f8; color: #166534; }
+        html.light .out-body { background: #f5f7fa; color: #1e293b; }
+        html.light .out-body .key { color: #1d4ed8; }
+        html.light .out-body .string { color: #16a34a; }
+        html.light .out-body .number { color: #d97706; }
+        html.light .out-body .null { color: #9ca3af; }
+        html.light .empty-msg { color: #9ca3af; }
+        /* Test / validation cards */
+        html.light .tc-card { border-color: rgba(0,0,0,0.1); }
+        html.light .tc-hdr { background: rgba(0,0,0,0.02); }
+        html.light .tc-hdr:hover { background: rgba(0,0,0,0.05); }
+        html.light .tstat.total { background: rgba(0,0,0,0.06); }
+        html.light .tc-body { background: rgba(0,0,0,0.025); border-top-color: rgba(0,0,0,0.08); }
+        html.light .tc-reason { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.08); color: #4b5563; }
+        html.light .tfiles { border-color: rgba(0,0,0,0.1); }
+        html.light .tfiles-hdr { background: rgba(0,0,0,0.03); border-bottom-color: rgba(0,0,0,0.08); }
+        /* Document review output */
+        html.light .dr-section-title { border-bottom-color: rgba(0,0,0,0.08); }
+        html.light .dr-doc-card { border-color: rgba(0,0,0,0.1); }
+        html.light .dr-doc-name { color: #1e293b; }
+        html.light .dr-badge.dim { background: rgba(0,0,0,0.04); color: #6b7280; border-color: rgba(0,0,0,0.09); }
+        html.light .dr-scan-row { background: rgba(0,0,0,0.025); border-color: rgba(0,0,0,0.08); }
+        html.light .dr-scan-name { color: #374151; }
+        html.light .dr-scan-size { color: #9ca3af; }
+        html.light .dr-scan-match.no { color: #9ca3af; }
+        html.light .dr-conf { color: #9ca3af; }
+        html.light .dr-ctype.unsupported { background: rgba(0,0,0,0.04); color: #6b7280; border-color: rgba(0,0,0,0.09); }
+        html.light .dr-quality-note { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.09); color: #4b5563; }
+        /* Worker badge */
+        html.light .worker-badge { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); }
+        html.light .worker-badge-name { color: #18181b; }
+        /* Config panel */
+        html.light .cfg-panel { background: #ffffff; border-color: rgba(0,0,0,0.14); box-shadow: 0 24px 60px rgba(0,0,0,0.18); }
+        html.light .cfg-head { background: #f7f7f9; border-bottom-color: rgba(0,0,0,0.1); }
+        html.light .cfg-close { border-color: rgba(0,0,0,0.1); }
+        html.light .cfg-close:hover { background: rgba(0,0,0,0.06); }
+        html.light .cfg-sec-title { border-bottom-color: rgba(0,0,0,0.08); }
+        html.light .cfg-input, html.light .cfg-textarea { background: #ffffff; border-color: rgba(0,0,0,0.14); }
+        html.light .step-cfg-card { background: #f5f5f8; border-color: rgba(0,0,0,0.1); }
+        html.light .step-cfg-hdr { background: rgba(0,0,0,0.02); }
+        html.light .step-cfg-hdr:hover { background: rgba(0,0,0,0.05); }
+        html.light .step-cfg-body { border-top-color: rgba(0,0,0,0.08); }
+        html.light .cfg-foot { background: #f7f7f9; border-top-color: rgba(0,0,0,0.08); }
+        html.light .cfg-cancel { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); }
+        html.light .cfg-cancel:hover { background: rgba(0,0,0,0.08); }
+        /* Modals */
+        html.light .modal { background: #ffffff; border-color: rgba(0,0,0,0.14); box-shadow: 0 24px 60px rgba(0,0,0,0.18); }
+        html.light .modal input[type="file"] { background: #f7f7f9; border-color: rgba(0,0,0,0.14); }
+        html.light .m-cancel { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); }
+        /* User/avatar */
+        html.light .user-avatar-btn { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); }
+        html.light .user-avatar-btn:hover { background: rgba(0,0,0,0.08); }
+        /* Scrollbars */
+        html.light ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); }
+        html.light ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
+    </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header class="app-header">
+    <div class="header-brand">Agent <span>Workflow</span></div>
+    <div class="worker-badge" id="workerBadge">
+        <div class="worker-badge-icon" id="workerBadgeIcon"></div>
+        <div class="worker-badge-label">
+            <div class="worker-badge-role">Digital Worker</div>
+            <div class="worker-badge-name" id="workerBadgeName"></div>
+        </div>
+    </div>
+    <div class="task-wrap">
+        <select id="taskInput"><option value="" disabled selected>Loading tasks…</option></select>
+        <button class="btn-cog" onclick="openConfig()" title="Configure task">⚙</button>
+    </div>
+    <button class="hbtn hbtn-blue" id="submitBtn" onclick="submitTask()">⬇ Load</button>
+    <button class="hbtn hbtn-green" id="runStepBtn" onclick="handleRunClick()">Run Next Step</button>
+    <div class="header-sep"></div>
+    <a href="report.html" class="hbtn-purple" style="background:#1d4ed8;" onmouseover="this.style.background='#1a44c4'" onmouseout="this.style.background='#1d4ed8'">&#128203; Reports</a>
+    <a href="validation_report.html" target="_blank" class="hbtn-purple">📊 Validation</a>
+    <a href="test_report.html" class="hbtn-purple" style="background:#7c2d12;" onmouseover="this.style.background='#6b2410'" onmouseout="this.style.background='#7c2d12'">&#9989; Test Reports</a>
+    <a href="processes.html" class="hbtn-purple" style="background:#0f766e;" onmouseover="this.style.background='#0d6460'" onmouseout="this.style.background='#0f766e'">&#128196; Processes</a>
+    <a href="extractions.html" class="hbtn-purple" style="background:#1e3a5f;" onmouseover="this.style.background='#1a3354'" onmouseout="this.style.background='#1e3a5f'">&#128202; Extractions</a>
+    <div class="header-sep"></div>
+    <div class="user-avatar-btn" id="userAvatarBtn" title="Signed in">
+        <img id="headerAvatar" src="" alt="">
+        <span id="headerUserName"></span>
+    </div>
+    <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle light/dark mode"></button>
+    <button class="logout-btn" onclick="logout()" title="Sign out">⏻</button>
+    <span id="headerStatus">Select a task to begin</span>
+</header>
+
+<!-- ── BODY ── -->
+<div class="app-body">
+
+    <!-- Canvas -->
+    <div class="canvas-wrap" id="canvasWrap">
+        <div class="canvas-inner" id="canvasInner">
+            <svg class="edges-svg" id="edgesSvg" overflow="visible"></svg>
+            <div id="nodeContainer"></div>
+        </div>
+        <div class="canvas-empty" id="canvasEmpty">
+            <div class="canvas-empty-icon">⬡</div>
+            <div class="canvas-empty-text">Select a task and click Load to build the workflow graph</div>
+        </div>
+        <div class="canvas-ctrls">
+            <button class="canvas-ctrl" onclick="fitView()" title="Fit view">⊡</button>
+            <button class="canvas-ctrl" onclick="zoomIn()"  title="Zoom in">+</button>
+            <button class="canvas-ctrl" onclick="zoomOut()" title="Zoom out">−</button>
+        </div>
+        <div class="canvas-hint">Scroll to zoom · Drag to pan · Click node to inspect</div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="s-tabs">
+            <button class="s-tab active" data-tab="logs"     onclick="switchTab('logs')">Exec Logs</button>
+            <button class="s-tab"        data-tab="output"   onclick="switchTab('output')">Step Output</button>
+            <button class="s-tab"        data-tab="tests"    onclick="switchTab('tests')">Test Results</button>
+            <button class="s-tab"        data-tab="services" onclick="switchTab('services');loadServices()">Services</button>
+        </div>
+        <div class="s-panel">
+            <div class="tab-c active" id="tab-logs">
+                <div class="logs-body" id="consoleOutput">[SYSTEM] Ready…</div>
+            </div>
+            <div class="tab-c" id="tab-output">
+                <div class="out-wrap">
+                    <div class="s-selector">
+                        <label>Step:</label>
+                        <select id="outputStepSelect" onchange="showStepOutput()">
+                            <option value="" disabled selected>No steps executed</option>
+                        </select>
+                    </div>
+                    <div class="out-body" id="outputBody">
+                        <div class="empty-msg">Execute a step to see its output here.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-c" id="tab-tests">
+                <div class="test-wrap">
+                    <div class="s-selector">
+                        <label>Step:</label>
+                        <select id="testStepSelect" onchange="showTestOutput()">
+                            <option value="" disabled selected>No tests executed</option>
+                        </select>
+                    </div>
+                    <div class="test-body" id="testBody">
+                        <div class="empty-msg">Execute a step to see test results here.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-c" id="tab-services">
+                <div class="svc-body" id="svcBody">
+                    <div class="svc-refresh">
+                        <button class="svc-run-btn" onclick="switchTab('logs');submitTask()">▶ Run Task</button>
+                        <button class="svc-refresh-btn" onclick="loadServices()">&#8635; Refresh</button>
+                    </div>
+                    <div id="svcCards"><div class="empty-msg">Loading services…</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── CONFIG OVERLAY ── -->
+<div class="cfg-overlay" id="cfgOverlay" onclick="cfgClickOutside(event)">
+    <div class="cfg-panel" id="cfgPanel">
+        <div class="cfg-head">
+            <h2 id="cfgTitle">Task Configuration</h2>
+            <button class="cfg-close" onclick="closeConfig()">✕</button>
+        </div>
+        <div class="cfg-body" id="cfgBody">
+            <div style="color:var(--text-muted);font-size:0.82rem;">Select a task first.</div>
+        </div>
+        <div class="cfg-foot">
+            <button class="cfg-btn cfg-cancel" onclick="closeConfig()">Cancel</button>
+            <button class="cfg-btn cfg-apply"  onclick="applyConfig()">Apply &amp; Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── UPLOAD MODAL ── -->
+<div class="modal-overlay" id="uploadModal">
+    <div class="modal">
+        <h3>File Required</h3>
+        <p id="uploadMsg">This step requires a file upload to proceed.</p>
+        <input type="file" id="fileInput">
+        <div class="modal-actions">
+            <button class="m-cancel"  onclick="closeModal()">Cancel</button>
+            <button class="m-confirm" onclick="confirmUpload()">Upload &amp; Execute</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── FOLDER MODAL ── -->
+<div class="modal-overlay" id="folderModal">
+    <div class="modal">
+        <h3>Select Documents Folder</h3>
+        <p id="folderMsg">Enter the folder path containing the documents to review.</p>
+        <input type="text" id="folderInput" placeholder="/documents"
+            style="display:block;width:100%;margin-bottom:14px;color:var(--text);font-size:0.78rem;background:#2a2a2a;border:1px solid rgba(255,255,255,0.14);border-radius:6px;padding:10px;outline:none;">
+        <div class="modal-actions">
+            <button class="m-cancel"  onclick="closeFolderModal()">Cancel</button>
+            <button class="m-confirm" onclick="confirmFolder()">Run Step</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+// Auth — populate header user info on load
+(function() {
+    try {
+        const auth = JSON.parse(sessionStorage.getItem('agent_auth') || 'null');
+        if (auth) {
+            const img = document.getElementById('headerAvatar');
+            const nm  = document.getElementById('headerUserName');
+            if (img && auth.picture) img.src = auth.picture;
+            if (nm)  nm.textContent = auth.name || auth.email || '';
+        }
+    } catch(e) {}
+})();
+
+function toggleTheme() {
+    const light = document.documentElement.classList.toggle('light');
+    localStorage.setItem('theme', light ? 'light' : 'dark');
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.textContent = light ? '🌙' : '☀️';
+}
+(function(){ const b=document.getElementById('themeToggleBtn'); if(b) b.textContent=document.documentElement.classList.contains('light')?'🌙':'☀️'; })();
+
+function logout() {
+    const auth = JSON.parse(sessionStorage.getItem('agent_auth') || 'null');
+    sessionStorage.removeItem('agent_auth');
+    if (typeof google !== 'undefined' && auth && auth.email) {
+        google.accounts.id.revoke(auth.email, () => window.location.replace('/login.html'));
+    } else {
+        window.location.replace('/login.html');
+    }
+}
+
+let currentPlanId   = null;
+let currentStepIdx  = 0;
+let planSteps       = [];
+let stepStatuses    = [];
+let stepOutputs     = [];
+let stepValidations = [];
+let stepEnabled     = [];  // true = will run, false = skipped
+let selectedNode    = null;
+let _stepAbortCtrl  = null;  // AbortController for the currently-running step fetch
+let allTemplates    = [];
+let rawTaskData     = null;
+let cfgTaskData     = null;
+let agentModels     = {};  // { agent_id: model_name }
+
+async function fetchAgentModels() {
+    try {
+        const r = await fetch('/api/orchestrator/agent_models');
+        if (r.ok) agentModels = await r.json();
+    } catch (_) {}
+}
+
+// ═══════════════════════════════════════════
+//  CANVAS PAN / ZOOM
+// ═══════════════════════════════════════════
+const NW  = 280;  // node width
+const NVW = 220;  // validator node width
+const GX  = 624;  // horizontal gap between step columns
+const NY  = 0;    // step row Y (centre lane)
+const VY  = 408;  // validator row Y (linear layout)
+const NH_APPROX   = 240; // approx step node height for port positioning
+const BRANCH_GAP  = 672; // vertical distance between parallel-group rows
+
+let panX = 60, panY = 70, scale = 1;
+let panning = false, pStartX, pStartY, pOffX, pOffY;
+
+// Per-node positions (populated by renderWorkflow, updated by drag)
+let nodePositions = [], valPositions = [];
+let draggingNode = null, dragDidMove = false;
+
+const wrap  = document.getElementById('canvasWrap');
+const inner = document.getElementById('canvasInner');
+
+function applyXform() {
+    inner.style.transform = `translate(${panX}px,${panY}px) scale(${scale})`;
+}
+
+wrap.addEventListener('mousedown', e => {
+    if (e.button === 0 && !e.target.closest('.node') && !e.target.closest('.canvas-ctrl')) {
+        panning = true; pStartX = e.clientX; pStartY = e.clientY; pOffX = panX; pOffY = panY;
+        wrap.classList.add('panning');
+    }
+});
+window.addEventListener('mousemove', e => {
+    if (draggingNode !== null) {
+        const dx = (e.clientX - draggingNode.startX) / scale;
+        const dy = (e.clientY - draggingNode.startY) / scale;
+        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragDidMove = true;
+        const newX = draggingNode.origX + dx;
+        const newY = draggingNode.origY + dy;
+        if (draggingNode.isVal) valPositions[draggingNode.idx]  = { x: newX, y: newY };
+        else                   nodePositions[draggingNode.idx] = { x: newX, y: newY };
+        // Repel other nodes away from the dragged one
+        const spread = applyRepulsion(nodePositions, valPositions, planSteps);
+        nodePositions = spread.nodePos;
+        valPositions  = spread.valPos;
+        // Sync all node elements to their (possibly repelled) positions
+        nodePositions.forEach((p, i) => {
+            const ne = document.getElementById('snode-' + i);
+            if (ne) { ne.style.left = p.x + 'px'; ne.style.top = p.y + 'px'; }
+        });
+        valPositions.forEach((p, i) => {
+            const ve = document.getElementById('vnode-' + i);
+            if (ve) { ve.style.left = p.x + 'px'; ve.style.top = p.y + 'px'; }
+        });
+        redrawEdges();
+        return;
+    }
+    if (!panning) return;
+    panX = pOffX + (e.clientX - pStartX);
+    panY = pOffY + (e.clientY - pStartY);
+    applyXform();
+});
+window.addEventListener('mouseup', () => {
+    draggingNode = null;
+    document.body.style.cursor = '';
+    panning = false;
+    wrap.classList.remove('panning');
+});
+
+wrap.addEventListener('wheel', e => {
+    e.preventDefault();
+    const r = wrap.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    const d  = e.deltaY < 0 ? 1.1 : 0.91;
+    const ns = Math.min(Math.max(scale * d, 0.18), 3);
+    panX = mx - (mx - panX) * (ns / scale);
+    panY = my - (my - panY) * (ns / scale);
+    scale = ns;
+    applyXform();
+}, { passive: false });
+
+// ── Layout helpers ──
+function computeInitialLayout(steps) {
+    const nodePos = new Array(steps.length);
+    const valPos  = new Array(steps.length);
+    let col = 0, i = 0;
+    while (i < steps.length) {
+        const group = steps[i].parallel_group;
+        if (group) {
+            const idxs = [];
+            let j = i;
+            while (j < steps.length && steps[j].parallel_group === group) { idxs.push(j); j++; }
+            const count = idxs.length;
+            idxs.forEach((idx, k) => {
+                const rowY = NY + (k - (count - 1) / 2) * BRANCH_GAP;
+                nodePos[idx] = { x: col * GX, y: rowY };
+                valPos[idx]  = { x: col * GX + 30, y: rowY + NH_APPROX + 80 };
+            });
+            col++; i = j;
+        } else {
+            nodePos[i] = { x: col * GX, y: NY };
+            valPos[i]  = { x: col * GX + 30, y: VY };
+            col++; i++;
+        }
+    }
+    return { nodePos, valPos };
+}
+
+// Returns the list of step indices that step i points to.
+function getNextStepIndices(steps, i) {
+    if (i >= steps.length - 1) return [];
+    const curGroup = steps[i].parallel_group;
+    if (curGroup) {
+        // Parallel step → first step after the group (join)
+        let j = i + 1;
+        while (j < steps.length && steps[j].parallel_group === curGroup) j++;
+        return j < steps.length ? [j] : [];
+    }
+    // Normal step → might fork into next group
+    const nextGroup = steps[i + 1].parallel_group;
+    if (nextGroup) {
+        const idxs = [];
+        let j = i + 1;
+        while (j < steps.length && steps[j].parallel_group === nextGroup) { idxs.push(j); j++; }
+        return idxs;
+    }
+    return [i + 1];
+}
+
+// ── Force simulation: repel overlapping nodes so they spread out ──────────────
+// Treats every (step node, validator node) pair as a particle with a bounding
+// box and applies a repulsion impulse until no pair overlaps (or max iterations).
+//
+// PAD_X / PAD_Y: minimum clear space between node boxes (in canvas px).
+// Validator nodes are anchored only vertically below their step node — their
+// X is locked to their step node's X so connectors stay aligned.
+//
+function applyRepulsion(nodePos, valPos, steps) {
+    // ── Tuning constants ───────────────────────────────────────────────────────
+    const PAD_X          = 36;   // minimum horizontal gap between any two boxes
+    const PAD_Y          = 28;   // minimum vertical gap between any two boxes
+    const INFLUENCE_R    = 420;  // radius of soft-repulsion field (area of influence)
+    const REPEL_STRENGTH = 2.2;  // force magnitude at the edge of the influence radius
+    const MAX_ITER       = 300;  // maximum simulation steps
+    const SETTLE_EPS     = 0.4;  // stop early when max displacement/iter drops below this
+    const VAL_GAP        = 32;   // minimum gap between a step node's bottom and its validator's top
+
+    const NH = NH_APPROX;
+    const VH = 200;
+
+    // ── Build mutable box array ────────────────────────────────────────────────
+    // Each box: { i, kind, x, y, w, h, vx, vy }  (vx/vy = accumulated velocity)
+    const stepB = nodePos.map((p, i) => ({ i, kind: 'step', x: p.x, y: p.y, w: NW,  h: NH, vx: 0, vy: 0 }));
+    const valB  = valPos.map( (p, i) => ({ i, kind: 'val',  x: p.x, y: p.y, w: NVW, h: VH, vx: 0, vy: 0 }));
+    const all   = [...stepB, ...valB];
+
+    for (let iter = 0; iter < MAX_ITER; iter++) {
+        // Zero out accumulated forces each step
+        all.forEach(b => { b.vx = 0; b.vy = 0; });
+
+        for (let a = 0; a < all.length; a++) {
+            for (let c = a + 1; c < all.length; c++) {
+                const A = all[a], B = all[c];
+
+                // ── Box centres ────────────────────────────────────────────────
+                const acx = A.x + A.w / 2,  acy = A.y + A.h / 2;
+                const bcx = B.x + B.w / 2,  bcy = B.y + B.h / 2;
+                const dx  = bcx - acx,       dy  = bcy - acy;
+
+                // ── Required minimum separation (half-extents + padding) ────────
+                const minSepX = (A.w + B.w) / 2 + PAD_X;
+                const minSepY = (A.h + B.h) / 2 + PAD_Y;
+
+                const penX = minSepX - Math.abs(dx);  // penetration depth on X
+                const penY = minSepY - Math.abs(dy);  // penetration depth on Y
+
+                if (penX > 0 && penY > 0) {
+                    // ── Hard collision: resolve along axis of least penetration ─
+                    const signX = dx >= 0 ? 1 : -1;
+                    const signY = dy >= 0 ? 1 : -1;
+                    if (penX < penY) {
+                        const push = penX / 2;
+                        A.vx -= signX * push;
+                        B.vx += signX * push;
+                    } else {
+                        const push = penY / 2;
+                        A.vy -= signY * push;
+                        B.vy += signY * push;
+                    }
+                } else {
+                    // ── Soft repulsion field (area of influence) ────────────────
+                    // Force falls off linearly from REPEL_STRENGTH at contact to 0 at INFLUENCE_R.
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist > 0 && dist < INFLUENCE_R) {
+                        const t     = 1 - dist / INFLUENCE_R;          // 1 at contact, 0 at edge
+                        const force = REPEL_STRENGTH * t * t;           // quadratic fall-off
+                        const fx    = (dx / dist) * force;
+                        const fy    = (dy / dist) * force;
+                        A.vx -= fx;  B.vx += fx;
+                        A.vy -= fy;  B.vy += fy;
+                    }
+                }
+            }
+        }
+
+        // ── Apply accumulated forces ───────────────────────────────────────────
+        let maxMove = 0;
+        all.forEach(b => {
+            b.x += b.vx;
+            b.y += b.vy;
+            maxMove = Math.max(maxMove, Math.abs(b.vx), Math.abs(b.vy));
+        });
+
+        // ── Re-pin each validator directly below its step node ─────────────────
+        valB.forEach((vb, i) => {
+            const sb  = stepB[i];
+            vb.x = sb.x + (NW - NVW) / 2;                   // horizontally centred
+            const minY = sb.y + NH + VAL_GAP;
+            if (vb.y < minY) vb.y = minY;                    // must stay below step
+        });
+
+        if (maxMove < SETTLE_EPS) break;
+    }
+
+    return {
+        nodePos: stepB.map(b => ({ x: b.x, y: b.y })),
+        valPos:  valB.map( b => ({ x: b.x, y: b.y })),
+    };
+}
+
+function fitView() {
+    if (!planSteps.length) { panX = 60; panY = 70; scale = 1; applyXform(); return; }
+    const r  = wrap.getBoundingClientRect();
+    const cw = r.width  - 80;
+    const ch = r.height - 80;
+    // Compute actual bounding box from node positions
+    const maxX = nodePositions.reduce((m, p) => Math.max(m, p.x), 0) + NW;
+    const minY = nodePositions.reduce((m, p) => Math.min(m, p.y), 0);
+    const maxY = valPositions.reduce((m, p) => Math.max(m, p.y), 0) + 130;
+    const tw = maxX;
+    const th = maxY - minY + 80;
+    const s  = Math.min(cw / tw, ch / th, 0.7);
+    scale = s;
+    panX = (r.width  - tw * s) / 2;
+    panY = (r.height - th * s) / 2 - minY * s + 20;
+    applyXform();
+}
+function zoomIn()  { scale = Math.min(scale * 1.18, 3);  applyXform(); }
+function zoomOut() { scale = Math.max(scale * 0.82, 0.18); applyXform(); }
+applyXform();
+
+// ═══════════════════════════════════════════
+//  AGENT COLOUR / ICON MAP
+// ═══════════════════════════════════════════
+function nodeColor(id) {
+    if (!id) return '#303050';
+    const s = id.toLowerCase();
+    if (s.includes('asset') && s.includes('ops'))           return '#4a2d72';
+    if (s.includes('content') || s.includes('reviewer'))    return '#1a5c42';
+    if (s.includes('extractor') || s.includes('extract'))   return '#1a4a5c';
+    if (s.includes('mapper')  || s.includes('mapping'))     return '#5c4218';
+    if (s.includes('verif'))                                 return '#5c1e1e';
+    if (s.includes('decomp'))                                return '#1a3d62';
+    if (s.includes('consolidat'))                            return '#2d4a3e';
+    return '#2a3a5c';
+}
+function nodeIcon(id) {
+    if (!id) return '⬡';
+    const s = id.toLowerCase();
+    if (s.includes('asset') && s.includes('ops'))         return '📋';
+    if (s.includes('content') || s.includes('reviewer'))  return '🔍';
+    if (s.includes('extractor') || s.includes('extract')) return '📄';
+    if (s.includes('mapper')  || s.includes('mapping'))   return '🗺️';
+    if (s.includes('verif'))                               return '✅';
+    if (s.includes('decomp'))                              return '⚙️';
+    if (s.includes('consolidat'))                          return '📊';
+    return '🤖';
+}
+
+// ── Edge metadata helpers (module-scope so they are always available) ──
+function outMeta(aid) {
+    const s = (aid || '').toLowerCase();
+    if (s.includes('asset') && s.includes('ops'))           return { sym:'[ ]', icon:'≡', label:'Asset List',        rel:'Asset Extraction'   };
+    if (s.includes('extractor') || s.includes('extract'))   return { sym:'{e}', icon:'⊕', label:'Extraction Report', rel:'Document Extraction' };
+    if (s.includes('content') || s.includes('reviewer'))    return { sym:'(o)', icon:'⊙', label:'Document Review',   rel:'Content Review'     };
+    if (s.includes('mapper')  || s.includes('mapping'))     return { sym:'<>',  icon:'◈', label:'Asset Map',         rel:'Legend Mapping'     };
+    if (s.includes('verif'))                                 return { sym:'[v]', icon:'✓', label:'Verification',         rel:'Asset Verification'   };
+    if (s.includes('decomp'))                                return { sym:'[p]', icon:'⊞', label:'Task Plan',            rel:'Task Planning'        };
+    if (s.includes('consolidat'))                            return { sym:'[R]', icon:'⊞', label:'Consolidated Report',  rel:'Report Consolidation' };
+    return                                                          { sym:'->',  icon:'▷', label:'Output Data',          rel:'Data Transfer'        };
+}
+function inMeta(aid) {
+    const s = (aid || '').toLowerCase();
+    if (s.includes('extractor') || s.includes('extract'))   return { icon:'⊙', label:'Processing Plan' };
+    if (s.includes('content') || s.includes('reviewer'))    return { icon:'≡', label:'Document Files'  };
+    if (s.includes('mapper')  || s.includes('mapping'))     return { icon:'⊙', label:'Content Data'   };
+    if (s.includes('verif'))                                 return { icon:'◈', label:'Asset Map'       };
+    if (s.includes('decomp'))                                return { icon:'⊞', label:'Plan Input'     };
+    return                                                          { icon:'▷', label:'Input Data'      };
+}
+function portBadge(cx, cy, iconChr, txt, col, bg, brd, anchor) {
+    const safeText = (txt == null ? '' : String(txt));
+    const w = Math.max(safeText.length * 5.5 + 24, 42);
+    const ox = anchor === 'end' ? -(w + 2) : 2;
+    return `<g transform="translate(${cx},${cy - 16})">
+        <rect x="${ox}" y="-8" width="${w}" height="16" rx="8"
+              fill="${bg}" stroke="${brd}" stroke-width="0.7"/>
+        <text x="${ox + 8}" y="3.5" fill="${col}"
+              font-size="8" font-family="-apple-system,sans-serif" font-weight="700">${iconChr}</text>
+        <text x="${ox + 17}" y="3.5" fill="${col}"
+              font-size="7.5" font-family="-apple-system,sans-serif" font-weight="600">${safeText}</text>
+    </g>`;
+}
+function relPill(cx, cy, iconChr, relLabel, statusMark, bg, brd, col) {
+    const full = String(relLabel || '') + (statusMark ? '  ' + statusMark : '');
+    const w = Math.max(full.length * 5.6 + 30, 68);
+    return `<g transform="translate(${cx},${cy - 24})">
+        <rect x="${-w/2}" y="-11" width="${w}" height="22" rx="11"
+              fill="${bg}" stroke="${brd}" stroke-width="0.9"/>
+        <text x="${-w/2 + 11}" y="4" fill="${col}"
+              font-size="10" font-family="-apple-system,sans-serif" font-weight="700">${iconChr}</text>
+        <text x="${-w/2 + 23}" y="4" fill="${col}"
+              font-size="8" font-family="-apple-system,sans-serif" font-weight="600">${relLabel || ''}</text>
+        ${statusMark ? `<text x="${w/2 - 10}" y="4" text-anchor="middle" fill="${col}"
+              font-size="9" font-family="-apple-system,sans-serif" font-weight="800">${statusMark}</text>` : ''}
+    </g>`;
+}
+
+function startNodeDrag(e, idx, isVal) {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    dragDidMove = false;
+    const pos = isVal ? valPositions[idx] : nodePositions[idx];
+    draggingNode = { idx, isVal, startX: e.clientX, startY: e.clientY,
+                     origX: pos ? pos.x : 0, origY: pos ? pos.y : 0 };
+    document.body.style.cursor = 'grabbing';
+}
+
+// ═══════════════════════════════════════════
+//  EDGE REDRAW (called on drag without full re-render)
+// ═══════════════════════════════════════════
+function redrawEdges() {
+    const svg = document.getElementById('edgesSvg');
+    if (!svg || !planSteps.length) return;
+    const isLight = document.documentElement.classList.contains('light');
+
+    // Compute SVG bounding box from actual node positions
+    const maxX = nodePositions.reduce((m, p) => Math.max(m, p.x), 0) + NW + 400;
+    const minY = nodePositions.reduce((m, p) => Math.min(m, p.y), 0);
+    const maxVY = valPositions.reduce((m, p) => Math.max(m, p.y), 0) + 200;
+    const svgOffY = Math.min(minY, 0) - 80;
+    svg.setAttribute('width',  maxX);
+    svg.setAttribute('height', maxVY - svgOffY);
+    svg.style.top = svgOffY + 'px';
+
+    let edgePaths = '';
+
+    // Helper: draw one step→step edge (handles fork/join visually)
+    function drawStepEdge(i, j, isFork, isJoin, suppressSrc, suppressDst) {
+        const np1 = nodePositions[i] || { x: i * GX, y: NY };
+        const np2 = nodePositions[j] || { x: j * GX, y: NY };
+        const st  = stepStatuses[i] || 'pending';
+        const agent   = (planSteps[i].required_resources && planSteps[i].required_resources.agent_id) || planSteps[i].assigned_resource_id || null;
+        const nextAgent = (planSteps[j].required_resources && planSteps[j].required_resources.agent_id) || planSteps[j].assigned_resource_id || null;
+        const isActive = st === 'active' || st === 'running';
+        const isDone   = st === 'completed';
+        const isError  = st === 'error';
+        const out = outMeta(agent);
+        const inp = inMeta(nextAgent);
+        const col  = isDone ? '#22c55e' : isActive ? '#f59e0b' : isError ? '#ef4444' : (isLight ? 'rgba(0,0,0,0.22)' : 'rgba(255,255,255,0.35)');
+        const sw   = isDone ? 2.2 : isActive ? 2 : 1.4;
+        const animC = isActive ? ' class="edge-anim"' : '';
+        const x1 = np1.x + NW,        y1 = np1.y + NH_APPROX / 2 - svgOffY;
+        const x2 = np2.x,             y2 = np2.y + NH_APPROX / 2 - svgOffY;
+        const dx = Math.abs(x2 - x1) * 0.42;
+        const mx = (x1 + x2) / 2,    my = (y1 + y2) / 2;
+        // Glow track
+        if (isActive || isDone) {
+            const gc = isDone ? 'rgba(34,197,94,0.07)' : 'rgba(245,158,11,0.09)';
+            edgePaths += `<path d="M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}" fill="none" stroke="${gc}" stroke-width="12" stroke-linecap="round"/>`;
+        }
+        edgePaths += `<path d="M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round"${animC}/>`;
+        edgePaths += `<polygon points="${x2-10},${y2-4} ${x2},${y2} ${x2-10},${y2+4}" fill="${col}" opacity="0.85"/>`;
+
+        // Port badges — only on first fork edge and last join edge to avoid clutter
+        const srcBg  = isDone ? 'rgba(34,197,94,0.12)' : isActive ? 'rgba(245,158,11,0.12)' : (isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.04)');
+        const srcBrd = isDone ? 'rgba(34,197,94,0.35)' : isActive ? 'rgba(245,158,11,0.35)' : (isLight ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.1)');
+        const srcCol = isDone ? '#4ade80' : isActive ? '#fbbf24' : (isLight ? '#555' : '#666');
+        if (!suppressSrc) edgePaths += portBadge(x1 + 4, y1, out.icon, (isDone ? '✓ ' : isActive ? '→ ' : '') + out.label, srcCol, srcBg, srcBrd, 'start');
+
+        const dstSt   = stepStatuses[j] || 'pending';
+        const dstDone = dstSt === 'completed';
+        const dstBg   = isDone ? 'rgba(34,197,94,0.08)' : isActive ? 'rgba(245,158,11,0.07)' : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.03)');
+        const dstBrd  = isDone ? 'rgba(34,197,94,0.25)' : isActive ? 'rgba(245,158,11,0.2)'  : (isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.07)');
+        const dstCol  = isDone ? '#4ade80' : isActive ? '#fbbf24' : (isLight ? '#555' : '#555');
+        if (!suppressDst) edgePaths += portBadge(x2 - 4, y2, inp.icon, inp.label + (dstDone ? ' ✓' : isDone ? ' →' : ''), dstCol, dstBg, dstBrd, 'end');
+
+        const pillBg = isDone ? 'rgba(34,197,94,0.1)'  : isActive ? 'rgba(245,158,11,0.12)' : isError ? 'rgba(239,68,68,0.1)' : (isLight ? 'rgba(235,236,242,0.97)' : 'rgba(14,14,22,0.92)');
+        const pillBr = isDone ? 'rgba(34,197,94,0.35)' : isActive ? 'rgba(245,158,11,0.4)'  : isError ? 'rgba(239,68,68,0.35)' : (isLight ? 'rgba(0,0,0,0.16)' : 'rgba(255,255,255,0.14)');
+        const pillTx = isDone ? '#4ade80' : isActive ? '#fbbf24' : isError ? '#f87171' : (isLight ? '#555' : '#888');
+        const pillLbl  = isFork ? 'Fork' : isJoin ? 'Join' : out.rel;
+        const pillIcon = isFork ? '⇉'   : isJoin ? '⇊'   : out.icon;
+        edgePaths += relPill(mx, my, pillIcon, pillLbl, isDone ? '✓' : isActive ? '▶' : isError ? '✗' : '', pillBg, pillBr, pillTx);
+    }
+
+    planSteps.forEach((step, i) => {
+        const np = nodePositions[i] || { x: i * GX, y: NY };
+        const vp = valPositions[i]  || { x: i * GX + 12, y: VY };
+        const st  = stepStatuses[i] || 'pending';
+        const val = stepValidations[i];
+        const vs  = !val ? 'pending' : (val.is_valid ? 'completed' : 'error');
+
+        // ── Step → next step(s) ──
+        const nextIdxs  = getNextStepIndices(planSteps, i);
+        const isFork    = nextIdxs.length > 1;
+        const srcInGroup = !!planSteps[i].parallel_group;
+        nextIdxs.forEach((j, k) => {
+            // suppressSrcBadge: on fork, only show on first edge; on join, never (handled by dst)
+            const suppressSrc = isFork ? k > 0 : false;
+            // suppressDstBadge: on join edges, only show on last one to avoid duplicate labels on same node
+            const suppressDst = srcInGroup ? k < nextIdxs.length - 1 : false;
+            drawStepEdge(i, j, isFork, srcInGroup, suppressSrc, suppressDst);
+        });
+
+        // ── Step → validator ──
+        const sx = np.x, sy = np.y - svgOffY;
+        const vx = vp.x, vy = vp.y - svgOffY;
+        const vIsDone  = vs === 'completed';
+        const vIsError = vs === 'error';
+        const vIsLive  = st === 'running';
+        const vCol   = vIsDone ? 'rgba(34,197,94,0.55)'  : vIsError ? 'rgba(239,68,68,0.45)'
+                     : vIsLive ? 'rgba(245,158,11,0.4)'  : (isLight ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.28)');
+        const vAnimC = vIsLive ? ' class="edge-anim-slow"' : ' stroke-dasharray="5 4"';
+        const x1 = sx + NW / 2,  y1 = sy + NH_APPROX;
+        const x2 = vx + NVW / 2, y2 = vy;
+        const dy = (y2 - y1) * 0.55;
+        const vmx = (x1 + x2) / 2 + 26, vmy = (y1 + y2) / 2;
+        const vArrCol = vIsDone ? (val && val.is_valid ? '#22c55e' : '#ef4444') : vIsLive ? '#f59e0b' : (isLight ? 'rgba(0,0,0,0.22)' : 'rgba(255,255,255,0.2)');
+        edgePaths += `<path d="M${x1},${y1} C${x1},${y1+dy} ${x2},${y2-dy} ${x2},${y2}" fill="none" stroke="${vCol}" stroke-width="1.6" stroke-linecap="round"${vAnimC}/>`;
+        edgePaths += `<polygon points="${x2-4},${y2-9} ${x2+4},${y2-9} ${x2},${y2}" fill="${vArrCol}" opacity="0.85"/>`;
+        const vSrcBg  = vIsLive ? 'rgba(245,158,11,0.1)' : vIsDone ? 'rgba(34,197,94,0.08)' : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.03)');
+        const vSrcBrd = vIsLive ? 'rgba(245,158,11,0.3)' : vIsDone ? 'rgba(34,197,94,0.25)' : (isLight ? 'rgba(0,0,0,0.13)' : 'rgba(255,255,255,0.08)');
+        const vSrcCol = vIsLive ? '#fbbf24' : vIsDone ? '#4ade80' : (isLight ? '#555' : '#555');
+        edgePaths += `<g transform="translate(${x1},${y1 + 6})"><rect x="-38" y="0" width="76" height="16" rx="8" fill="${vSrcBg}" stroke="${vSrcBrd}" stroke-width="0.7"/><text x="0" y="10" text-anchor="middle" fill="${vSrcCol}" font-size="8" font-family="-apple-system,sans-serif" font-weight="700">${vIsLive ? '▶ Validating' : vIsDone ? '✓ Validated' : '⊙ Validate'}</text></g>`;
+        const vIcon = vIsDone ? (val && val.is_valid ? '✓' : '✗') : vIsError ? '✗' : vIsLive ? '⋯' : '⊙';
+        const vLbl  = vIsDone ? (val && val.score != null ? `${val.score}%  ${val.is_valid ? 'Pass' : 'Fail'}` : (val && val.is_valid ? 'Pass' : 'Fail'))
+                    : vIsError ? 'Failed' : vIsLive ? 'Running' : 'Validate';
+        const vPBg  = vIsDone ? 'rgba(34,197,94,0.1)'  : vIsError ? 'rgba(239,68,68,0.1)'  : vIsLive ? 'rgba(245,158,11,0.1)' : (isLight ? 'rgba(235,236,242,0.97)' : 'rgba(14,14,22,0.88)');
+        const vPBr  = vIsDone ? 'rgba(34,197,94,0.35)' : vIsError ? 'rgba(239,68,68,0.35)' : vIsLive ? 'rgba(245,158,11,0.35)' : (isLight ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.1)');
+        const vPTx  = vIsDone ? '#4ade80' : vIsError ? '#f87171' : vIsLive ? '#fbbf24' : (isLight ? '#444' : '#555');
+        const vw = Math.max(vLbl.length * 5.6 + 28, 58);
+        edgePaths += `<g transform="translate(${vmx},${vmy})"><rect x="${-vw/2}" y="-10" width="${vw}" height="20" rx="10" fill="${vPBg}" stroke="${vPBr}" stroke-width="0.8"/><text x="${-vw/2+10}" y="4" fill="${vPTx}" font-size="9.5" font-family="-apple-system,sans-serif" font-weight="800">${vIcon}</text><text x="${-vw/2+22}" y="4" fill="${vPTx}" font-size="8" font-family="-apple-system,sans-serif" font-weight="600">${vLbl}</text></g>`;
+    });
+    svg.innerHTML = edgePaths;
+}
+
+// ═══════════════════════════════════════════
+//  RENDER WORKFLOW (nodes + edges)
+// ═══════════════════════════════════════════
+function renderWorkflow() {
+    const nc    = document.getElementById('nodeContainer');
+    const svg   = document.getElementById('edgesSvg');
+    const empty = document.getElementById('canvasEmpty');
+    if (!planSteps.length) { nc.innerHTML = ''; svg.innerHTML = ''; empty.style.display = 'flex'; return; }
+    empty.style.display = 'none';
+
+    // Reset positions to defaults (preserve if same number of steps)
+    if (nodePositions.length !== planSteps.length) {
+        const layout  = computeInitialLayout(planSteps);
+        // Apply repulsion so nodes spread out and don't overlap
+        const spread  = applyRepulsion(layout.nodePos, layout.valPos, planSteps);
+        nodePositions = spread.nodePos;
+        valPositions  = spread.valPos;
+    }
+
+    const STATUS_LABEL = { pending:'Pending', active:'Next', running:'Running', completed:'Done', error:'Error' };
+    let nodesHtml = '';
+
+    planSteps.forEach((step, i) => {
+        const sx = nodePositions[i].x, sy = nodePositions[i].y;
+        const vx = valPositions[i].x,  vy = valPositions[i].y;
+        const st    = stepStatuses[i] || 'pending';
+        const agent = (step.required_resources && step.required_resources.agent_id) || step.assigned_resource_id || null;
+        const tool  = (step.required_resources && step.required_resources.tool_id)  || null;
+        const kb    = (step.required_resources && step.required_resources.knowledge_id) || null;
+        const crit  = step.validation && step.validation.critical_fail;
+        const hdrC  = nodeColor(agent);
+        const icon  = nodeIcon(agent);
+
+        // Output inline section
+        let outHtml = '';
+        if (st === 'completed' && stepOutputs[i]) {
+            outHtml = `
+            <button class="node-out-btn" onclick="toggleNodeOut(event,${i})">{ } View Output</button>
+            <div class="node-out-body" id="nout-${i}" style="display:none;">${syntaxHL(stepOutputs[i])}</div>`;
+        }
+
+        // Node class list
+        const nc_cls = [
+            'node',
+            st === 'active'    ? 'st-active'    : '',
+            st === 'running'   ? 'st-running'   : '',
+            st === 'completed' ? 'st-completed'  : '',
+            st === 'error'     ? 'st-error'      : '',
+            selectedNode === i ? 'sel'            : '',
+            stepEnabled[i] === false ? 'st-skipped' : ''
+        ].filter(Boolean).join(' ');
+
+        const inM  = inMeta(agent);
+        const outM = outMeta(agent);
+
+        nodesHtml += `
+        <div class="${nc_cls}" id="snode-${i}" style="left:${sx}px;top:${sy}px;" onclick="selectNode(${i})">
+            <div class="node-hdr" style="background:${hdrC};cursor:grab;" onmousedown="startNodeDrag(event,${i},false)">
+                <span class="node-icon">${icon}</span>
+                <span class="node-title">Step ${step.step_number} · ${step.name || 'Step ' + step.step_number}</span>
+                ${step.parallel_group ? `<span class="node-parallel-badge" title="Runs in parallel">⇉ parallel</span>` : ''}
+                <span class="node-dot ${st}"></span>
+            </div>
+            <div class="node-body">
+                <div class="node-section" style="border-top:none;padding-top:7px;">
+                    <div class="node-lbl">Purpose</div>
+                    <div class="node-desc">${step.description || '—'}</div>
+                </div>
+                <div class="node-section">
+                    <div class="node-lbl">Agent</div>
+                    <div class="node-val"><span class="node-res-chip chip-agent">${icon} ${agent || 'Unassigned'}</span></div>
+                    ${agent && agentModels[agent] ? `<div class="node-model-badge">🤖 ${agentModels[agent]}</div>` : ''}
+                </div>
+                ${tool ? `<div class="node-section">
+                    <div class="node-lbl">Tool</div>
+                    <div class="node-val"><span class="node-res-chip chip-tool">🔧 ${tool}</span></div>
+                </div>` : ''}
+                ${kb ? `<div class="node-section">
+                    <div class="node-lbl">Knowledge</div>
+                    <div class="node-val">${kb.split(',').map(k => `<span class="node-res-chip chip-kb">📚 ${k.trim()}</span>`).join('<br>')}</div>
+                </div>` : ''}
+                <div class="node-io-grid">
+                    <div class="node-io-cell">
+                        <div class="node-lbl">Input</div>
+                        <div class="node-val">${inM.label}</div>
+                    </div>
+                    <div class="node-io-cell">
+                        <div class="node-lbl">Output</div>
+                        <div class="node-val">${outM.label}</div>
+                    </div>
+                </div>
+                ${crit ? `<div class="node-crit-row"><span class="node-crit-lbl">⚠ Critical step</span></div>` : ''}
+                ${outHtml ? `<div class="node-section">${outHtml}</div>` : ''}
+            </div>
+            <div class="node-foot ${st}">
+                <label class="node-enable-chk" onclick="event.stopPropagation()" title="${stepEnabled[i] ? 'Enabled – click to skip' : 'Skipped – click to enable'}">
+                    <input type="checkbox" ${stepEnabled[i] !== false ? 'checked' : ''} onchange="toggleStepEnabled(${i},this.checked)">
+                    <span>${STATUS_LABEL[st] || st}</span>
+                </label>
+                ${st === 'completed' || st === 'error' ? `<button class="node-rerun-btn" onclick="event.stopPropagation();rerunStep(${i})">↺ Re-run</button>` : ''}
+            </div>
+            <div class="port port-in"  style="top:${NH_APPROX/2 - 5}px;"></div>
+            <div class="port port-out ${st === 'completed' ? 'done' : ''}" style="top:${NH_APPROX/2 - 5}px;"></div>
+        </div>`;
+
+        // Validator node
+        const val = stepValidations[i];
+        const vs  = !val ? 'pending' : (val.is_valid ? 'completed' : 'error');
+        const vscore = val && val.score != null ? val.score + '%' : '';
+        const vLabel = !val ? 'Awaiting' : (val.is_valid ? 'Passed' : 'Failed');
+        const vHdrC  = vs === 'completed' ? '#193d25' : (vs === 'error' ? '#3d1919' : '#222');
+        const tcCount = val ? (val.test_cases || []).length : 0;
+        const tcPass  = val ? (val.test_cases || []).filter(t => t.result === 'PASS').length : 0;
+
+        const vBadges = val ? `
+            <div class="node-tags">
+                <span class="node-tag" style="${val.is_valid ? 'background:rgba(34,197,94,.12);color:#22c55e;' : 'background:rgba(239,68,68,.12);color:#ef4444;'}">
+                    ${val.is_valid ? '✓ Valid' : '✗ Invalid'}
+                </span>
+                ${tcCount > 0 ? `<span class="node-tag">${tcPass}/${tcCount} tests</span>` : ''}
+            </div>` : '';
+
+        const vCls = [
+            'node val-node',
+            vs === 'completed' ? 'st-completed' : '',
+            vs === 'error'     ? 'st-error'     : ''
+        ].filter(Boolean).join(' ');
+
+        nodesHtml += `
+        <div class="${vCls}" id="vnode-${i}" style="left:${vx}px;top:${vy}px;" onclick="selectValNode(${i})">
+            <div class="node-hdr" style="background:${vHdrC};cursor:grab;" onmousedown="startNodeDrag(event,${i},true)">
+                <span class="node-icon">🔬</span>
+                <span class="node-title">Validator · Step ${step.step_number}</span>
+                <span class="node-dot ${vs}"></span>
+            </div>
+            <div class="node-body">
+                <div class="node-sub">Step Validator Agent</div>
+                <div class="node-desc">${vscore ? `Score: ${vscore} — ` : ''}${vLabel}</div>
+                ${vBadges}
+            </div>
+            <div class="node-foot ${vs}">${vLabel}</div>
+            <div class="port port-in" style="top:24px;"></div>
+        </div>`;
+
+    });
+
+    nc.innerHTML = nodesHtml;
+    redrawEdges();
+}
+
+function toggleNodeOut(e, idx) {
+    e.stopPropagation();
+    const el = document.getElementById(`nout-${idx}`);
+    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function selectNode(i) {
+    if (dragDidMove) { dragDidMove = false; return; }
+    if (selectedNode !== null) { const el = document.getElementById(`snode-${selectedNode}`); if (el) el.classList.remove('sel'); }
+    selectedNode = i;
+    const el = document.getElementById(`snode-${i}`); if (el) el.classList.add('sel');
+    if (stepOutputs[i])          { document.getElementById('outputStepSelect').value = i; showStepOutput(); switchTab('output'); }
+    else if (stepValidations[i]) { document.getElementById('testStepSelect').value  = i; showTestOutput(); switchTab('tests');  }
+}
+function selectValNode(i) {
+    if (dragDidMove) { dragDidMove = false; return; }
+    if (stepValidations[i]) { document.getElementById('testStepSelect').value = i; showTestOutput(); switchTab('tests'); }
+}
+
+// ═══════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════
+function switchTab(tab) {
+    document.querySelectorAll('.s-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-c').forEach(t => t.classList.remove('active'));
+    document.querySelector(`.s-tab[data-tab="${tab}"]`).classList.add('active');
+    document.getElementById(`tab-${tab}`).classList.add('active');
+}
+
+// ═══════════════════════════════════════════
+//  SYNTAX HIGHLIGHT
+// ═══════════════════════════════════════════
+function syntaxHL(json) {
+    if (typeof json !== 'string') json = JSON.stringify(json, null, 2);
+    return json.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?)/g, m => {
+            if (/:$/.test(m)) return `<span class="key">${m}</span>`;
+            return `<span class="string">${m}</span>`;
+        })
+        .replace(/\b(-?\d+(\.\d+)?([eE][+-]?\d+)?)\b/g, '<span class="number">$1</span>')
+        .replace(/\bnull\b/g,'<span class="null">null</span>')
+        .replace(/\btrue\b/g,'<span class="number">true</span>')
+        .replace(/\bfalse\b/g,'<span class="number">false</span>');
+}
+
+// ═══════════════════════════════════════════
+//  STEP OUTPUT VIEWER
+// ═══════════════════════════════════════════
+function fmtBytes(b) {
+    if (!b && b !== 0) return '—';
+    if (b >= 1048576) return (b / 1048576).toFixed(1) + ' MB';
+    return (b / 1024).toFixed(1) + ' KB';
+}
+
+function qualityPill(conf) {
+    if (conf >= 0.8) return `<span class="dr-quality high">High ${Math.round(conf * 100)}%</span>`;
+    if (conf >= 0.5) return `<span class="dr-quality medium">Medium ${Math.round(conf * 100)}%</span>`;
+    return `<span class="dr-quality low">Low ${Math.round(conf * 100)}%</span>`;
+}
+
+function ctypePill(ct, tq) {
+    if (ct === 'text' && tq === 'high')   return `<span class="dr-ctype text">Text</span>`;
+    if (ct === 'text' && tq === 'low')    return `<span class="dr-ctype text-low">Text (partial)</span>`;
+    if (ct === 'text')                    return `<span class="dr-ctype text">Text</span>`;
+    if (ct === 'image')                   return `<span class="dr-ctype image">Image / Scan</span>`;
+    if (ct === 'unsupported')             return `<span class="dr-ctype unsupported">Unsupported</span>`;
+    if (ct === 'error')                   return `<span class="dr-ctype error">Read Error</span>`;
+    return '';
+}
+
+function readerPill(reader) {
+    if (!reader) return '';
+    const isOcr = reader === 'ocr-required';
+    return `<span class="dr-reader ${isOcr ? 'ocr' : ''}">${reader}</span>`;
+}
+
+function renderDocumentReview(out) {
+    const docs  = out.documents  || [];
+    const scans = out.scan_results || [];
+    const total   = out.total_files_scanned || scans.length;
+    const matched = out.matched_files || docs.length;
+
+    let html = `<div class="dr-wrap">`;
+
+    // ── Summary bar ──
+    html += `<div class="dr-stat-bar">
+        <span class="dr-stat scanned">${total} files scanned</span>
+        <span class="dr-stat matched">${matched} matched</span>
+        <span class="dr-stat identified">${docs.length} identified for next step</span>
+    </div>`;
+
+    // ── Selected for next step ──
+    html += `<div class="dr-section-title">Selected for Next Step</div>`;
+    if (docs.length === 0) {
+        html += `<div class="empty-msg" style="padding:1rem 0">No documents matched the search context.</div>`;
+    } else {
+        docs.forEach(doc => {
+            const typeIsKnown = doc.document_type && doc.document_type !== 'Unknown' && doc.document_type !== 'N/A';
+            html += `<div class="dr-doc-card">
+                <div class="dr-doc-name">${doc.filename}</div>
+                <div class="dr-doc-pills">
+                    ${typeIsKnown ? `<span class="dr-badge">${doc.document_type}</span>` : ''}
+                    ${qualityPill(doc.confidence || 0)}
+                    ${ctypePill(doc.content_type, doc.text_quality)}
+                    ${readerPill(doc.recommended_reader)}
+                </div>
+                <div class="dr-meta">`;
+            const fields = [
+                ['Title',       doc.document_title],
+                ['Author',      doc.author],
+                ['Date',        doc.date],
+                ['Project',     doc.project_name],
+                ['Project No.', doc.project_number],
+                ['Revision',    doc.revision]
+            ];
+            fields.forEach(([key, val]) => {
+                if (val) html += `<div class="dr-meta-row"><span class="dr-meta-key">${key}</span><span class="dr-meta-val">${val}</span></div>`;
+            });
+            if (doc.quality_note) {
+                html += `<div class="dr-quality-note">${doc.quality_note}</div>`;
+            }
+            html += `</div></div>`;
+        });
+    }
+
+    // ── All files scanned ──
+    html += `<div class="dr-section-title">All Files Scanned</div>`;
+    scans.forEach(r => {
+        const isMatch = r.content_match || r.filename_match;
+        const typeIsKnown = r.matched_document_type && r.matched_document_type !== 'Unknown' && r.matched_document_type !== 'N/A';
+        html += `<div class="dr-scan-row">
+            <span class="dr-scan-match ${isMatch ? 'yes' : 'no'}">${isMatch ? '✓' : '–'}</span>
+            <span class="dr-scan-name" title="${r.filename}">${r.filename}</span>
+            ${typeIsKnown ? `<span class="dr-badge ${isMatch ? '' : 'dim'}">${r.matched_document_type}</span>` : ''}
+            ${ctypePill(r.content_type, r.text_quality)}
+            ${readerPill(r.recommended_reader)}
+            <span class="dr-scan-size">${fmtBytes(r.file_size_bytes)}</span>
+            <span class="dr-conf">${r.overall_confidence != null ? Math.round(r.overall_confidence * 100) + '%' : ''}</span>
+        </div>`;
+    });
+
+    html += `</div>`;
+    return html;
+}
+
+function showStepOutput() {
+    const sel  = document.getElementById('outputStepSelect');
+    const body = document.getElementById('outputBody');
+    const idx  = parseInt(sel.value);
+    if (isNaN(idx) || !stepOutputs[idx]) { body.innerHTML = '<div class="empty-msg">No output data for this step.</div>'; return; }
+    const out = stepOutputs[idx];
+    if (out && typeof out === 'object' && Array.isArray(out.documents)) {
+        body.style.whiteSpace = 'normal';
+        body.innerHTML = renderDocumentReview(out);
+    } else {
+        body.style.whiteSpace = 'pre-wrap';
+        body.innerHTML = syntaxHL(out);
+    }
+}
+
+function updateOutputSel() {
+    const sel = document.getElementById('outputStepSelect');
+    const prev = sel.value; sel.innerHTML = '';
+    let any = false;
+    planSteps.forEach((s, i) => {
+        if (stepStatuses[i] === 'completed') {
+            any = true;
+            const o = document.createElement('option'); o.value = i;
+            o.textContent = `Step ${s.step_number}: ${s.name || 'Action'}${stepOutputs[i] ? ' ●' : ''}`;
+            sel.appendChild(o);
+        }
+    });
+    if (!any) sel.innerHTML = '<option value="" disabled selected>No steps executed</option>';
+    else if (prev !== '') sel.value = prev;
+}
+
+// ═══════════════════════════════════════════
+//  TEST OUTPUT VIEWER
+// ═══════════════════════════════════════════
+function showTestOutput() {
+    const sel  = document.getElementById('testStepSelect');
+    const body = document.getElementById('testBody');
+    const idx  = parseInt(sel.value);
+    if (isNaN(idx) || !stepValidations[idx]) { body.innerHTML = '<div class="empty-msg">No test results for this step.</div>'; return; }
+    const v = stepValidations[idx];
+    const tcs = v.test_cases || [];
+    const sum = v.test_run_summary || {};
+    const overall  = sum.overall_result || (v.is_valid ? 'PASS' : 'FAIL');
+    const cls      = overall === 'PASS' ? 'pass' : 'fail';
+    const total    = sum.total_tests || tcs.length;
+    const passed   = sum.passed || tcs.filter(t => t.result === 'PASS').length;
+    const failed   = sum.failed || tcs.filter(t => t.result === 'FAIL').length;
+    const score    = sum.score != null ? sum.score : (v.score != null ? v.score : '?');
+    const sumText  = sum.summary || v.summary || '';
+
+    let html = `
+    <div class="tsumm ${cls}">
+        <span class="tsumm-res ${cls}">${overall}</span>
+        <div class="tsumm-stats">
+            <span class="tstat total">${total} tests</span>
+            <span class="tstat passed">${passed} passed</span>
+            ${failed > 0 ? `<span class="tstat failed">${failed} failed</span>` : ''}
+            <span class="tstat score">${score}%</span>
+        </div>
+    </div>`;
+    if (sumText) html += `<div class="tsumm-text">${sumText}</div>`;
+
+    function fileItems(files, defRole) {
+        return files.map(f => {
+            const role    = f.role || defRole || 'file';
+            const roleCls = role === 'input' ? 'input' : (role === 'test_report' ? 'report' : 'output');
+            const icon    = role === 'input' ? '📥' : (role === 'test_report' ? '📄' : '📤');
+            const ing     = f.ingested != null ? `<span class="tfile-ing ${f.ingested ? 'yes':'no'}">${f.ingested ? 'Ingested':'Not ingested'}</span>` : '';
+            const sz      = f.size_chars ? `<span class="tfile-sz">${(f.size_chars/1024).toFixed(1)}KB</span>` : '';
+            return `<div class="tfile ${roleCls}">
+                <span>${icon}</span>
+                <span class="tfile-name">${f.filename || 'Unknown'}</span>
+                <span class="tfile-role ${roleCls}">${role}</span>${ing}${sz}
+            </div>`;
+        }).join('');
+    }
+    function filesPanel(title, readArr, outArr, readLbl, outLbl) {
+        if (!readArr.length && !outArr.length) return '';
+        let h = `<div class="tfiles"><div class="tfiles-hdr"><span class="tfiles-title">${title}</span></div><div class="tfiles-body">`;
+        if (readArr.length) h += `<div style="font-size:.62rem;font-weight:700;color:#555;margin-bottom:2px;">${readLbl}</div>${fileItems(readArr,'input')}`;
+        if (outArr.length)  h += `<div style="font-size:.62rem;font-weight:700;color:#555;margin:4px 0 2px;">${outLbl}</div>${fileItems(outArr,'output')}`;
+        return h + '</div></div>';
+    }
+    const af = v.agent_files || {};
+    html += filesPanel('🤖 Agent Files', af.files_read || [], af.files_output || [], 'Files Read', 'Files Output');
+    const vf = v.files || {};
+    html += filesPanel('🔬 Validator Files', vf.files_read || [], vf.files_output || [], 'Files Ingested', 'Reports Generated');
+
+    if (tcs.length) {
+        tcs.forEach((tc, ti) => {
+            const tCls   = tc.result === 'PASS' ? 'pass' : 'fail';
+            const tIcon  = tc.result === 'PASS' ? '✓' : '✗';
+            const catCls = (tc.category || '').toLowerCase().replace(/ /g,'_');
+            const mis    = tc.result === 'FAIL' ? ' mismatch' : '';
+            const bid    = `tcb-${idx}-${ti}`;
+            const chid   = `tch-${idx}-${ti}`;
+            html += `
+            <div class="tc-card ${tCls}">
+                <div class="tc-hdr" onclick="toggleTC('${bid}','${chid}')">
+                    <div class="tc-icon ${tCls}">${tIcon}</div>
+                    <span class="tc-id">${tc.test_id || '?'}</span>
+                    <span class="tc-name">${tc.test_name || 'Unnamed'}</span>
+                    <span class="tc-cat ${catCls}">${tc.category || '?'}</span>
+                    <span class="tc-chev" id="${chid}">▾</span>
+                </div>
+                <div class="tc-body" id="${bid}">
+                    ${tc.description ? `<div class="tc-field"><div class="tc-flabel">Description</div><div class="tc-fval">${tc.description}</div></div>` : ''}
+                    ${tc.input_data  ? `<div class="tc-field"><div class="tc-flabel">Input Examined</div><div class="tc-fval" style="font-size:.65rem;background:rgba(0,0,0,.3);padding:5px 6px;border-radius:4px;white-space:pre-wrap;word-break:break-word;">${tc.input_data}</div></div>` : ''}
+                    <div class="tc-field"><div class="tc-flabel">Expected</div><div class="tc-fval expected">${tc.expected_output || tc.expected || 'N/A'}</div></div>
+                    <div class="tc-field"><div class="tc-flabel">Actual</div><div class="tc-fval actual${mis}">${tc.actual_output || tc.actual || 'N/A'}</div></div>
+                    ${tc.execution_notes ? `<div class="tc-field"><div class="tc-flabel">Notes</div><div class="tc-fval" style="font-size:.65rem;color:#888;background:rgba(245,158,11,.07);padding:5px 6px;border-radius:4px;white-space:pre-wrap;">${tc.execution_notes}</div></div>` : ''}
+                    ${tc.reasoning ? `<div class="tc-field"><div class="tc-flabel">Reasoning</div><div class="tc-reason">${tc.reasoning}</div></div>` : ''}
+                </div>
+            </div>`;
+        });
+    } else {
+        html += '<div class="empty-msg">No individual test cases available.</div>';
+    }
+    const issues = (v.issues || []).filter(x => x);
+    if (issues.length) html += `<div class="t-issues"><div class="t-sec-title">Issues</div>${issues.map(x=>`<div class="t-sec-item issue">${x}</div>`).join('')}</div>`;
+    const recs = (v.recommendations || []).filter(x => x);
+    if (recs.length) html += `<div class="t-recs"><div class="t-sec-title">Recommendations</div>${recs.map(x=>`<div class="t-sec-item rec">${x}</div>`).join('')}</div>`;
+    body.innerHTML = html;
+}
+
+function toggleTC(bid, chid) {
+    const b = document.getElementById(bid), c = document.getElementById(chid);
+    if (b) { const o = b.classList.toggle('open'); if (c) c.classList.toggle('open', o); }
+}
+function updateTestSel() {
+    const sel = document.getElementById('testStepSelect');
+    const prev = sel.value; sel.innerHTML = '';
+    let any = false;
+    planSteps.forEach((s, i) => {
+        if (stepStatuses[i] === 'completed' && stepValidations[i]) {
+            any = true;
+            const v = stepValidations[i];
+            const ov = (v.test_run_summary && v.test_run_summary.overall_result) || (v.is_valid ? 'PASS' : 'FAIL');
+            const o = document.createElement('option'); o.value = i;
+            o.textContent = `Step ${s.step_number}: ${s.name || 'Action'} [${ov}]`;
+            sel.appendChild(o);
+        }
+    });
+    if (!any) sel.innerHTML = '<option value="" disabled selected>No tests executed</option>';
+    else if (prev !== '') sel.value = prev;
+}
+
+// ═══════════════════════════════════════════
+//  CONFIG PANEL
+// ═══════════════════════════════════════════
+function openConfig() {
+    const name = document.getElementById('taskInput').value;
+    if (!name) { alert('Select a task first.'); return; }
+    document.getElementById('cfgTitle').textContent = `Configure: ${name}`;
+    buildCfgPanel();
+    document.getElementById('cfgOverlay').classList.add('open');
+}
+function closeConfig() { document.getElementById('cfgOverlay').classList.remove('open'); }
+function cfgClickOutside(e) { if (e.target === document.getElementById('cfgOverlay')) closeConfig(); }
+
+function buildCfgPanel() {
+    const body = document.getElementById('cfgBody');
+    const data = rawTaskData || cfgTaskData;
+    if (!data) { body.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;">No task data available.</div>'; return; }
+    let html = `
+    <div class="cfg-section">
+        <div class="cfg-sec-title">Task Overview</div>
+        <div class="cfg-field"><label class="cfg-label">Name</label><input class="cfg-input" id="cfn-name" value="${esc(data.name||'')}" readonly></div>
+        <div class="cfg-field"><label class="cfg-label">Description</label><textarea class="cfg-textarea" id="cfn-desc">${esc(data.description||'')}</textarea></div>
+        <div class="cfg-row2">
+            <div class="cfg-field"><label class="cfg-label">Est. Duration</label><input class="cfg-input" id="cfn-dur" value="${esc(data.estimated_duration||'')}"></div>
+            <div class="cfg-field"><label class="cfg-label">Template ID</label><input class="cfg-input" id="cfn-tid" value="${esc(data.template_id||'')}" readonly></div>
+        </div>
+        <div class="cfg-field">
+            <label class="cfg-label">Triggers</label>
+            <input class="cfg-input" id="cfn-triggers" value="${esc((data.triggers||[]).join(', '))}">
+        </div>
+    </div>
+    <div class="cfg-section">
+        <div class="cfg-sec-title">Steps</div>`;
+    (data.steps || []).forEach((step, i) => {
+        html += `
+        <div class="step-cfg-card">
+            <div class="step-cfg-hdr" onclick="toggleStepCfg(${i})">
+                <div class="step-cfg-num">${step.step_number}</div>
+                <span class="step-cfg-name">${esc(step.name || 'Step ' + step.step_number)}</span>
+                <span class="step-cfg-chev" id="scchev-${i}">▾</span>
+            </div>
+            <div class="step-cfg-body" id="scbody-${i}">
+                <div class="cfg-field"><label class="cfg-label">Step Name</label><input class="cfg-input" id="sc-name-${i}" value="${esc(step.name||'')}"></div>
+                <div class="cfg-field"><label class="cfg-label">Description</label><textarea class="cfg-textarea" id="sc-desc-${i}">${esc(step.description||'')}</textarea></div>
+                <div class="cfg-row2">
+                    <div class="cfg-field"><label class="cfg-label">Agent ID</label><input class="cfg-input" id="sc-agent-${i}" value="${esc((step.required_resources && step.required_resources.agent_id)||'')}"></div>
+                    <div class="cfg-field"><label class="cfg-label">Tool ID</label><input class="cfg-input" id="sc-tool-${i}" value="${esc((step.required_resources && step.required_resources.tool_id)||'')}"></div>
+                </div>
+                <div class="cfg-field"><label class="cfg-label">Validation Criteria</label><textarea class="cfg-textarea" id="sc-val-${i}" style="min-height:48px;">${esc((step.validation && step.validation.criteria)||'')}</textarea></div>
+                <div class="cfg-row2">
+                    <div class="cfg-field"><label class="cfg-label">Critical Fail</label>
+                        <select class="cfg-input" id="sc-crit-${i}">
+                            <option value="false" ${!(step.validation && step.validation.critical_fail) ? 'selected':''}>No</option>
+                            <option value="true"  ${ (step.validation && step.validation.critical_fail) ? 'selected':''}>Yes</option>
+                        </select>
+                    </div>
+                    <div class="cfg-field"><label class="cfg-label">Max Retries</label><input class="cfg-input" type="number" id="sc-retry-${i}" value="${(step.validation && step.validation.max_retries) || ''}"></div>
+                </div>
+            </div>
+        </div>`;
+    });
+    html += '</div>';
+    body.innerHTML = html;
+}
+function toggleStepCfg(i) {
+    const b = document.getElementById(`scbody-${i}`), c = document.getElementById(`scchev-${i}`);
+    if (b) { const o = b.classList.toggle('open'); if (c) c.classList.toggle('open', o); }
+}
+function applyConfig() {
+    if (!rawTaskData) { closeConfig(); return; }
+    const d = JSON.parse(JSON.stringify(rawTaskData));
+    d.description        = document.getElementById('cfn-desc').value;
+    d.estimated_duration = document.getElementById('cfn-dur').value;
+    (d.steps || []).forEach((s, i) => {
+        s.name = document.getElementById(`sc-name-${i}`).value;
+        s.description = document.getElementById(`sc-desc-${i}`).value;
+        if (!s.required_resources) s.required_resources = {};
+        s.required_resources.agent_id = document.getElementById(`sc-agent-${i}`).value;
+        s.required_resources.tool_id  = document.getElementById(`sc-tool-${i}`).value;
+        if (!s.validation) s.validation = {};
+        s.validation.criteria     = document.getElementById(`sc-val-${i}`).value;
+        s.validation.critical_fail = document.getElementById(`sc-crit-${i}`).value === 'true';
+        const mr = document.getElementById(`sc-retry-${i}`).value;
+        if (mr) s.validation.max_retries = parseInt(mr);
+    });
+    cfgTaskData = d;
+    closeConfig();
+}
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ═══════════════════════════════════════════
+//  LOAD TASKS
+// ═══════════════════════════════════════════
+// Worker definitions keyed by template_id — no API dependency
+const TEMPLATE_WORKER_MAP = {
+    'tmpl-jr-review-identify-design-brief-docs': { name: 'Junior Engineer', icon: '👷' }
+};
+
+async function loadTasks() {
+    const sel = document.getElementById('taskInput');
+    try {
+        const r = await fetch('/api/decomposer/tasks');
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        allTemplates = data.templates || [];
+        sel.innerHTML = '<option value="" disabled selected>— Select a task —</option>';
+        allTemplates.forEach(t => {
+            const o = document.createElement('option');
+            o.value = t.name; o.textContent = t.name; o.title = t.description || '';
+            sel.appendChild(o);
+        });
+        sel.addEventListener('change', onTaskChange);
+    } catch(e) {
+        sel.innerHTML = '<option value="" disabled selected>Failed to load tasks</option>';
+        console.error('[UI] loadTasks:', e);
+    }
+}
+function onTaskChange() {
+    const name  = document.getElementById('taskInput').value;
+    rawTaskData = allTemplates.find(t => t.name === name) || null;
+    cfgTaskData = null;
+    const st    = document.getElementById('headerStatus');
+    if (rawTaskData) { st.textContent = `${(rawTaskData.steps || []).length} steps · ${rawTaskData.estimated_duration || '?'}`; st.className = ''; }
+    else { st.textContent = ''; st.className = ''; }
+
+    const badge     = document.getElementById('workerBadge');
+    const badgeIcon = document.getElementById('workerBadgeIcon');
+    const badgeName = document.getElementById('workerBadgeName');
+    const tid    = rawTaskData && rawTaskData.template_id;
+    const worker = tid && TEMPLATE_WORKER_MAP[tid];
+    if (worker) {
+        badgeIcon.textContent = worker.icon;
+        badgeName.textContent = worker.name;
+        badge.classList.add('show');
+    } else {
+        badge.classList.remove('show');
+    }
+}
+document.addEventListener('DOMContentLoaded', () => { loadTasks(); fetchAgentModels(); });
+
+// ═══════════════════════════════════════════
+//  DECOMPOSE
+// ═══════════════════════════════════════════
+async function submitTask() {
+    const inp    = document.getElementById('taskInput');
+    const btn    = document.getElementById('submitBtn');
+    const runBtn = document.getElementById('runStepBtn');
+    const clog   = document.getElementById('consoleOutput');
+    if (!inp.value) return;
+    btn.disabled = true; runBtn.style.display = 'none';
+    currentPlanId = null; currentStepIdx = 0;
+    planSteps = []; stepStatuses = []; stepOutputs = []; stepValidations = []; stepEnabled = []; selectedNode = null;
+    document.getElementById('outputBody').innerHTML   = '<div class="empty-msg">Execute a step to see its output here.</div>';
+    document.getElementById('outputStepSelect').innerHTML = '<option value="" disabled selected>No steps executed</option>';
+    document.getElementById('testBody').innerHTML     = '<div class="empty-msg">Execute a step to see test results here.</div>';
+    document.getElementById('testStepSelect').innerHTML   = '<option value="" disabled selected>No tests executed</option>';
+    renderWorkflow();
+    clog.innerText = `> Analysis started for: "${inp.value}"…\n`;
+    try {
+        const resp = await fetch('/api/decomposer/decompose', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task: inp.value })
+        });
+        if (!resp.ok) throw new Error(`Server Error: ${resp.status}`);
+        const data = await resp.json();
+        planSteps       = (cfgTaskData && cfgTaskData.steps) ? cfgTaskData.steps : data.plan.steps;
+        stepStatuses    = planSteps.map((_, i) => i === 0 ? 'active' : 'pending');
+        stepOutputs     = planSteps.map(() => null);
+        stepValidations = planSteps.map(() => null);
+        stepEnabled     = planSteps.map((_, i) => ![2, 3, 4].includes(i));  // steps 3,4,5 disabled by default (0-indexed)
+        renderWorkflow();
+        fitView();
+        clog.innerText += `> Plan generated with ${planSteps.length} steps.\n`;
+        const st = document.getElementById('headerStatus');
+        st.textContent = `${planSteps.length} steps generated`; st.className = 'live';
+        if (data.orchestrator_data && data.orchestrator_data.plan_id) {
+            currentPlanId = data.orchestrator_data.plan_id;
+            clog.innerText += `> Plan ID: ${currentPlanId}\n> Starting automatically...\n`;
+            runBtn.style.display = 'inline-flex';
+            autoAdvance();
+        } else {
+            const reason = (data.execution_status) ? ` (${data.execution_status})` : '';
+            clog.innerText += `[ERROR] Orchestrator did not return a plan ID${reason}.\n> Check that all services are running and rebuild containers if needed.\n`;
+            const st = document.getElementById('headerStatus');
+            st.textContent = 'Orchestrator unavailable'; st.className = '';
+        }
+    } catch(e) {
+        clog.innerText += `[ERROR] ${e.message}\n`;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+// ═══════════════════════════════════════════
+//  RUN STEP
+// ═══════════════════════════════════════════
+function stepNeedsInput(step) {
+    const r = ((step.required_resources && step.required_resources.agent_id) || step.assigned_resource_id || '').toLowerCase();
+    const t = ((step.required_resources && step.required_resources.tool_id) || '').toLowerCase();
+    return {
+        needsFile:   (r.includes('asset') && r.includes('ops')) || (r.includes('content') && r.includes('reviewer')) || r.includes('verif'),
+        needsFolder: r.includes('document') && r.includes('reviewer') && !t.includes('plan'),
+    };
+}
+
+function toggleStepEnabled(i, checked) {
+    stepEnabled[i] = checked;
+    renderWorkflow();
+    if (!checked && i === currentStepIdx && currentPlanId) {
+        // If a fetch is in-flight for this step, abort it — the AbortError handler
+        // in executeStep will return cleanly without calling autoAdvance again.
+        if (_stepAbortCtrl) {
+            stepStatuses[i] = 'pending';
+            renderWorkflow();
+            _stepAbortCtrl.abort();
+            _stepAbortCtrl = null;
+        }
+        currentStepIdx++;
+        autoAdvance();
+    }
+}
+
+function rerunStep(i) {
+    if (!currentPlanId) return;
+    currentStepIdx = i;
+    stepStatuses[i] = 'active';
+    stepOutputs[i]     = null;
+    stepValidations[i] = null;
+    renderWorkflow();
+    switchTab('logs');
+    autoAdvance();
+}
+
+// Auto-advance: called after plan creation and after each successful step.
+// Runs the next step automatically unless it needs user input, in which case
+// the appropriate modal opens and waits for the user to confirm.
+// Skips steps where stepEnabled[i] === false.
+function autoAdvance() {
+    if (!currentPlanId || currentStepIdx >= planSteps.length) return;
+    // Skip disabled steps
+    while (currentStepIdx < planSteps.length && stepEnabled[currentStepIdx] === false) {
+        stepStatuses[currentStepIdx] = 'pending';
+        currentStepIdx++;
+    }
+    if (currentStepIdx >= planSteps.length) {
+        const runBtn = document.getElementById('runStepBtn');
+        const st     = document.getElementById('headerStatus');
+        runBtn.style.display = 'none';
+        st.textContent = 'Workflow complete'; st.className = 'done';
+        renderWorkflow();
+        return;
+    }
+    const step = planSteps[currentStepIdx];
+    const { needsFile, needsFolder } = stepNeedsInput(step);
+    const runBtn = document.getElementById('runStepBtn');
+    const st     = document.getElementById('headerStatus');
+
+    if (needsFolder) {
+        document.getElementById('folderInput').value = '/documents';
+        document.getElementById('folderMsg').textContent = `Step ${step.step_number} (${step.name || 'Action'}): enter the folder path.`;
+        document.getElementById('folderModal').classList.add('open');
+        setTimeout(() => document.getElementById('folderInput').select(), 50);
+        runBtn.innerText = `▶ Step ${step.step_number}: ${step.name || 'Execute'}`;
+        runBtn.disabled = false;
+        st.textContent = `Step ${step.step_number} needs input`; st.className = 'live';
+    } else if (needsFile) {
+        document.getElementById('fileInput').value = '';
+        document.getElementById('uploadMsg').textContent = `Step ${step.step_number} (${step.name || 'Action'}) requires a file upload.`;
+        document.getElementById('uploadModal').classList.add('open');
+        runBtn.innerText = `▶ Step ${step.step_number}: ${step.name || 'Execute'}`;
+        runBtn.disabled = false;
+        st.textContent = `Step ${step.step_number} needs input`; st.className = 'live';
+    } else {
+        // No input needed — run automatically after a short pause
+        runBtn.innerText = `⟳ Step ${step.step_number}: ${step.name || 'Execute'}`;
+        runBtn.disabled = true;
+        setTimeout(() => executeStep(null), 500);
+    }
+}
+
+function handleRunClick() {
+    // Manual trigger: delegate to autoAdvance for consistent behaviour.
+    // For non-input steps this re-triggers execution; for input steps it
+    // re-opens the relevant modal.
+    if (!currentPlanId || currentStepIdx >= planSteps.length) return;
+    const step = planSteps[currentStepIdx];
+    const { needsFile, needsFolder } = stepNeedsInput(step);
+    if (needsFolder) {
+        document.getElementById('folderInput').value = '/documents';
+        document.getElementById('folderMsg').textContent = `Step ${step.step_number} (${step.name || 'Action'}): enter the folder path.`;
+        document.getElementById('folderModal').classList.add('open');
+        setTimeout(() => document.getElementById('folderInput').select(), 50);
+    } else if (needsFile) {
+        document.getElementById('fileInput').value = '';
+        document.getElementById('uploadMsg').textContent = `Step ${step.step_number} (${step.name || 'Action'}) requires a file upload.`;
+        document.getElementById('uploadModal').classList.add('open');
+    } else {
+        executeStep(null);
+    }
+}
+function closeModal() { document.getElementById('uploadModal').classList.remove('open'); }
+async function confirmUpload() {
+    const fi = document.getElementById('fileInput');
+    if (!fi.files.length) { alert('Please select a file.'); return; }
+    closeModal(); executeStep(fi.files[0]);
+}
+function closeFolderModal() { document.getElementById('folderModal').classList.remove('open'); }
+async function confirmFolder() {
+    const fp = document.getElementById('folderInput').value.trim();
+    if (!fp) { alert('Please enter a folder path.'); return; }
+    closeFolderModal(); executeStep(null, fp);
+}
+
+async function executeStep(file, folderPath) {
+    const runBtn = document.getElementById('runStepBtn');
+    const clog   = document.getElementById('consoleOutput');
+    const exIdx  = currentStepIdx;
+    // Skip if this step is disabled
+    if (stepEnabled[exIdx] === false) {
+        currentStepIdx++;
+        autoAdvance();
+        return;
+    }
+    runBtn.disabled = true; runBtn.innerText = 'Running…';
+    stepStatuses[exIdx] = 'running';
+    renderWorkflow();
+    const st = document.getElementById('headerStatus');
+    st.textContent = `Running step ${exIdx + 1}…`; st.className = 'live';
+    _stepAbortCtrl = new AbortController();
+
+    // Scroll the active node into the visible viewport
+    const node = document.getElementById(`snode-${exIdx}`);
+    if (node) {
+        const wRect  = wrap.getBoundingClientRect();
+        const nx = exIdx * GX * scale + panX;
+        const nw = NW * scale;
+        if (nx < 0 || nx + nw > wRect.width) {
+            panX = wRect.width / 2 - (exIdx * GX + NW / 2) * scale;
+            applyXform();
+        }
+    }
+
+    try {
+        const url = `/api/orchestrator/run_next/${currentPlanId}`;
+        let opts;
+        const fd = new FormData();
+        fd.append('step_index', exIdx);
+        if (file)       fd.append('file', file);
+        if (folderPath) fd.append('folder_path', folderPath);
+        opts = { method: 'POST', body: fd, signal: _stepAbortCtrl.signal };
+        const resp = await fetch(url, opts);
+        if (!resp.ok) throw new Error(`Execution Failed: ${resp.status}`);
+        const result = await resp.json();
+
+        if (result.status === 'paused' && result.action === 'request_file_upload') {
+            clog.innerText += `\n[PAUSED] ${result.message}\n`;
+            stepStatuses[exIdx] = 'active'; renderWorkflow();
+            document.getElementById('uploadMsg').textContent = result.message;
+            document.getElementById('uploadModal').classList.add('open');
+            runBtn.innerText = 'Retry Step'; runBtn.disabled = false;
+            return;
+        }
+        clog.innerText += `\n${result.log}\n`;
+        if (result.step_output)  stepOutputs[exIdx]     = result.step_output;
+        if (result.parallel_step_validations) {
+            Object.entries(result.parallel_step_validations).forEach(([i, v]) => { stepValidations[parseInt(i)] = v; });
+        } else if (result.validation) {
+            stepValidations[exIdx] = result.validation;
+        }
+
+        // Step agent returned an error (all server-side retries exhausted)
+        if (result.status === 'error') {
+            stepStatuses[exIdx] = 'error'; renderWorkflow();
+            st.textContent = `Step ${exIdx + 1} failed`; st.className = '';
+            clog.innerText += `\n[FAILED] Step ${exIdx + 1} failed after server retries. Click Retry to try again.\n`;
+            runBtn.innerText = `↺ Retry Step ${exIdx + 1}`; runBtn.disabled = false;
+            clog.scrollTop = clog.scrollHeight;
+            return;
+        }
+
+        // Mark all completed indices (parallel groups complete multiple steps at once)
+        if (result.parallel_completed_indices) {
+            result.parallel_completed_indices.forEach(i => { stepStatuses[i] = 'completed'; });
+        } else {
+            stepStatuses[exIdx] = 'completed';
+        }
+        updateOutputSel(); updateTestSel();
+        if (result.step_output) { document.getElementById('outputStepSelect').value = exIdx; showStepOutput(); }
+        const hasValidation = result.validation || result.parallel_step_validations;
+        if (hasValidation) { document.getElementById('testStepSelect').value = exIdx; showTestOutput(); switchTab('tests'); }
+        renderWorkflow();
+
+        _stepAbortCtrl = null;
+        if (result.status === 'completed') {
+            clog.innerText += '\n[SYSTEM] Workflow Finished.\n';
+            runBtn.style.display = 'none';
+            st.textContent = 'Workflow complete'; st.className = 'done';
+        } else {
+            currentStepIdx = result.step_index;
+            stepStatuses[currentStepIdx] = 'active';
+            renderWorkflow();
+            st.textContent = `Step ${exIdx + 1} done`; st.className = 'live';
+            autoAdvance();
+        }
+        clog.scrollTop = clog.scrollHeight;
+    } catch(e) {
+        _stepAbortCtrl = null;
+        // User cancelled by unticking — step was already skipped by toggleStepEnabled
+        if (e.name === 'AbortError') return;
+        clog.innerText += `\n[ERROR] ${e.message}\n`;
+        stepStatuses[exIdx] = 'error'; renderWorkflow();
+        st.textContent = `Step ${exIdx + 1} failed`; st.className = '';
+        runBtn.innerText = `↺ Retry Step ${exIdx + 1}`; runBtn.disabled = false;
+    } finally {
+        const txt = runBtn.innerText;
+        const autoRunning = txt.startsWith('⟳');
+        const retrying    = txt.startsWith('↺') || txt === 'Retry Step';
+        if (runBtn.style.display !== 'none' && !autoRunning && !retrying) {
+            runBtn.disabled = false;
+        }
+    }
+}
+
+// ═══════════════════════════════════════════
+//  SERVICES TAB
+// ═══════════════════════════════════════════
+async function loadServices() {
+    const container = document.getElementById('svcCards');
+    container.innerHTML = '<div class="empty-msg">Loading…</div>';
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
+    try {
+        const resp = await fetch('/api/orchestrator/services/status', { signal: ctrl.signal });
+        clearTimeout(tid);
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
+        const data = await resp.json();
+        renderServiceCards(data.services);
+    } catch(e) {
+        clearTimeout(tid);
+        const msg = e.name === 'AbortError' ? 'Request timed out (is the orchestrator running?)' : e.message;
+        container.innerHTML = `<div class="empty-msg" style="color:#f87171;">Failed to load services: ${msg}</div>`;
+    }
+}
+
+function renderServiceCards(services) {
+    const container = document.getElementById('svcCards');
+    container.innerHTML = '';
+    for (const svc of services) {
+        const isRunning = svc.status === 'running';
+        const dotClass  = svc.status === 'running' ? 'running' : svc.status === 'exited' ? 'exited' : '';
+        const card = document.createElement('div');
+        card.className = 'svc-card';
+        card.id = `svc-card-${svc.name}`;
+        card.innerHTML = `
+            <div class="svc-dot ${dotClass}" id="svc-dot-${svc.name}"></div>
+            <span class="svc-label">${svc.label}</span>
+            <span class="svc-status" id="svc-status-${svc.name}">${svc.status}</span>
+            <div class="svc-btns">
+                <button class="svc-btn run-step" onclick="switchTab('logs');executeStep(null)">▶ Run Step</button>
+                <button class="svc-btn restart"  onclick="serviceAction('${svc.name}','restart')">Restart</button>
+            </div>`;
+        container.appendChild(card);
+    }
+}
+
+async function serviceAction(name, action) {
+    const dot    = document.getElementById(`svc-dot-${name}`);
+    const status = document.getElementById(`svc-status-${name}`);
+    const card   = document.getElementById(`svc-card-${name}`);
+    // Disable buttons during action
+    card.querySelectorAll('.svc-btn').forEach(b => b.disabled = true);
+    if (dot) { dot.className = 'svc-dot loading'; }
+    if (status) status.textContent = 'restarting…';
+    try {
+        const resp = await fetch(`/api/orchestrator/services/${name}/${action}`, { method: 'POST' });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
+    } catch(e) {
+        if (status) status.textContent = `Error: ${e.message}`;
+        if (dot) dot.className = 'svc-dot exited';
+        card.querySelectorAll('.svc-btn').forEach(b => b.disabled = false);
+        return;
+    }
+    // Poll for updated status after a short delay
+    setTimeout(() => loadServices(), 1500);
+}
+</script>
+</body>
+</html>

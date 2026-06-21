@@ -1,0 +1,383 @@
+{
+  "process_id": "proc-extract-site-plan-info",
+  "process_name": "Extract Information from Site Plans",
+  "version": "1.0",
+  "worker_id": "dw-junior-engineer",
+  "worker_name": "Junior Engineer",
+  "summary": "Review and extract key engineering data from a submitted site plan document package. The process identifies all relevant site plan drawings (electrical network diagrams, substation drawings, and site layout plans), reads each matched document, and extracts structured data from Substation Notes annotations covering: Substation Asset Number, Transformer Size, HV Switchgear (with a conditional override rule for 1.5MVA transformers), Voltage Level, LV Switchgear, Cubicle Size, and Earthing. A conditional rule is applied: if the transformer size is 1.5MVA, the HV Switchgear must be recorded as Siemens RLR regardless of what is annotated in the drawing. Produces a structured JSON output per document and a consolidated process output.",
+  "search_context": "Site plan drawings for an electrical network project submitted to ACME Energy. Target documents include: electrical network diagrams showing HV and LV infrastructure, substation layout drawings (pole substations, padmount substations, kiosk substations), site layout plans with electrical asset annotations, and engineering drawings containing a 'Substation Notes' or 'Sub Notes' callout table. Key filename indicators: documents with 'RETIC' (reticulation drawing), 'DWG' (engineering drawing), or a drawing number prefix (e.g. D followed by digits, A followed by digits) in the filename. Key content indicators: a Substation Notes annotation block containing fields for Transformer Size, HV Switchgear, Voltage Level, LV Switchgear, Cubicle Size, and Earthing. Engineering drawings produced to ACME Energy or similar network operator standards. Target file types: PDF engineering drawings, scanned drawing sets. Exclude: design brief documents identified by 'BRIEF' or 'DESIGN_BRIEF' in the filename — these are Design Brief documents and must be assigned document_category 'Design Brief'.",
+  "process_input": {
+    "description": "A folder containing the site plan document package for a project, including all relevant PDFs and engineering drawings (electrical network diagrams, substation layout drawings, and site plans) submitted for the project.",
+    "format": "Folder path containing PDF or other supported document types",
+    "example": "/documents/DAR1509-84/SitePlans/",
+    "required_fields": [
+      "folder_path"
+    ]
+  },
+  "process_output": {
+    "description": "A structured JSON object containing the extracted substation and electrical asset data from the site plan Substation Notes, including all conditional rule outcomes, linked to the source document and drawing.",
+    "format": "JSON",
+    "required_fields": [
+      "substation_asset_number",
+      "transformer_size",
+      "hv_switchgear",
+      "hv_switchgear_override_applied",
+      "voltage_level",
+      "lv_switchgear",
+      "cubicle_size",
+      "earthing"
+    ]
+  },
+  "document_categorisation": {
+    "description": "Rules for identifying and categorising a document as a 'Site Plan' document. When Step 2 (Plan Document Processing Approach) assigns a 'document_category' field to each entry in the processing plan, it must apply these rules. A document must satisfy at least two positive indicators and must not satisfy any negative indicators to be categorised as 'Site Plan'.",
+    "category": "Site Plan",
+    "positive_indicators": {
+      "filename_patterns": [
+        "Contains 'RETIC' or 'retic' (e.g. DAR1509_RETIC, DS1_DAR1988_RETIC — indicates a reticulation drawing)",
+        "Contains 'DWG' as part of the filename (indicates an engineering drawing)",
+        "Contains 'SITEPLAN', 'SITE_PLAN', or 'site_plan'",
+        "Contains 'SUBSTATION' or 'SUB' as the primary descriptor (not as a section heading within a brief)",
+        "Drawing number prefix format (e.g. D followed by digits, A followed by digits) typical of network operator drawing numbering conventions",
+        "Contains 'ELEC', 'ELECTRICAL', or 'NETWORK' in conjunction with a drawing reference"
+      ],
+      "document_type_values": [
+        "Reticulation Drawing",
+        "Electrical Network Diagram",
+        "Site Plan Drawing",
+        "Substation Drawing",
+        "Network Diagram",
+        "Engineering Drawing",
+        "HV Network Diagram",
+        "LV Network Diagram",
+        "Pole Substation Drawing",
+        "Padmount Substation Drawing"
+      ],
+      "content_keywords": [
+        "Substation Notes",
+        "Sub Notes",
+        "Transformer Size",
+        "HV Switchgear",
+        "LV Switchgear",
+        "Cubicle Size",
+        "Voltage Level",
+        "Earthing",
+        "Asset Number",
+        "Pole Sub",
+        "Padmount",
+        "Kiosk Sub",
+        "Ring Main Unit",
+        "RMU",
+        "Feeder",
+        "HV Cable",
+        "LV Cable"
+      ],
+      "structural_indicators": [
+        "Contains a 'Substation Notes' or 'Sub Notes' callout table or annotation block",
+        "Is a PDF produced from a CAD or drawing system (not a word-processed document)",
+        "Contains a drawing title block with drawing number, revision, and scale",
+        "Contains electrical network symbols: transformer symbols, cable route lines, substation symbols, pole symbols",
+        "Filename follows a drawing number convention (e.g. DS1, DS1)"
+      ]
+    },
+    "negative_indicators": {
+      "description": "If any of these are present, the document must NOT be categorised as 'Site Plan' — classify it as 'Design Brief' instead.",
+      "filename_patterns": [
+        "Contains 'BRIEF' or 'brief' (e.g. DESIGN_BRIEF, Design_Brief)",
+        "Contains 'ARP' as a standalone prefix without a drawing number suffix (ARP numbers alone typically identify design brief documents)"
+      ],
+      "document_type_values": [
+        "Design Brief",
+        "Architectural Brief",
+        "Services Brief",
+        "Town Planning Report",
+        "Connection Offer",
+        "Customer Connection Brief"
+      ],
+      "content_keywords": [
+        "Method of Supply Requirement (as a section heading — indicates a design brief)",
+        "Determination of Funding Requirements (as a section heading — indicates a design brief)",
+        "HV Works, LV Works, SL Works (as structured sub-headings within a supply requirements section)"
+      ]
+    },
+    "decision_rule": "If the document contains a 'Substation Notes' annotation table or is an engineering drawing with a title block and drawing number, classify as 'Site Plan'. If it contains a 'Method of Supply' or 'Determination of Funding Requirements' section, classify as 'Design Brief'. When uncertain, prefer 'Site Plan' for drawing/diagram files and 'Design Brief' for text-based PDF documents."
+  },
+
+  "steps": [
+    {
+      "step_number": 1,
+      "step_id": "step-identify-site-plan-documents",
+      "step_name": "Identify and Review Site Plan Documents",
+      "summary": "Scan the submitted document package folder, assess each file against the site plan search context, and produce a structured list of matched documents with extracted metadata. Identifies which documents are electrical network drawings, substation drawings, or site layout plans, and classifies each by type.",
+      "details": "Upload the site plan package folder path to the Document Reviewer Agent. The agent lists all files in the folder, assesses each filename for relevance using an LLM (targeting electrical network diagrams, substation layout drawings, and site plans), reads file content for matched candidates, and performs a content match analysis. Returns a ranked list of matched documents with metadata including document title, type, author, date, drawing number, and revision. Only documents with overall_confidence > 0.5 are included in the matched documents list. The output file is saved to the OUTPUT directory.",
+      "expected_input": {
+        "description": "A folder path containing the site plan document package.",
+        "fields": {
+          "folder_path": "Absolute path to the folder containing site plan documents (e.g. /documents/DAR1509-84/SitePlans/)",
+          "search_context": "Site plan drawings for an electrical network project, including: electrical network diagrams showing HV and LV infrastructure, substation layout drawings (pole substations, padmount substations, kiosk substations), site layout plans with electrical asset annotations, drawings containing 'Substation Notes' or 'Sub Notes' callout tables, and engineering drawings produced to ACME Energy or similar network operator standards. Target file types: PDF engineering drawings, scanned drawing sets."
+        }
+      },
+      "expected_output": {
+        "description": "A DocumentReview JSON file listing all matched site plan documents with metadata and quality indicators.",
+        "fields": {
+          "documents": "Array of matched document objects, each with filename, document_title, document_type, author, date, drawing_number, revision, confidence, content_type, text_quality, and recommended_reader",
+          "scan_results": "Full scan results for all files including those not matched",
+          "matched_files": "Integer count of matched files",
+          "total_files_scanned": "Integer count of all files scanned",
+          "output_file": "Path to the saved DocumentReview_*.json file"
+        }
+      },
+      "actual_input": {
+        "source": "User-provided folder path via the frontend folder prompt",
+        "agent_id": "agent-document-reviewer",
+        "tool_id": "tool-list-folder-files",
+        "endpoint": "POST http://document-reviewer:8089/review"
+      },
+      "actual_output": {
+        "stored_as": "state.results.document_review",
+        "file_pattern": "OUTPUT/DocumentReview_<timestamp>.json",
+        "key_used_by_next_step": "output_file"
+      }
+    },
+    {
+      "step_number": 2,
+      "step_id": "step-plan-document-processing",
+      "step_name": "Plan Document Processing Approach",
+      "summary": "Read the Step 1 document review output and the tool registry to determine the best processing tool for each matched site plan document, whether format conversion is needed (e.g. scanned PDF to PNG for OCR), and the extraction method to use.",
+      "details": "The Document Processing Planner reads the Step 1 DocumentReview output file and the registry.json. For each document in the matched list, it uses an LLM to assess the document's content_type and text_quality and selects the most appropriate processing tool from the registry. Site plan drawings are frequently image-based (scanned or plotted to PDF without selectable text); if a document is image-based or has no extractable text (text_quality = none), conversion to PNG for OCR is flagged as required. Outputs a ProcessingPlan JSON file with one entry per document.",
+      "expected_input": {
+        "description": "The Step 1 DocumentReview output file path, automatically retrieved from the orchestrator state.",
+        "fields": {
+          "step1_output_file": "Path to the DocumentReview_*.json file produced by Step 1"
+        }
+      },
+      "expected_output": {
+        "description": "A ProcessingPlan JSON file with a processing entry per matched site plan document.",
+        "fields": {
+          "processing_plan": "Array of processing entries, each with: filename, document_type, content_type, text_quality, recommended_reader, processing_tool_id, conversion_required, conversion_type, extraction_method, processing_notes",
+          "total_documents": "Integer count of entries in processing_plan",
+          "output_file": "Path to the saved ProcessingPlan_*.json file"
+        }
+      },
+      "actual_input": {
+        "source": "Automatically passed from Step 1 output — no user input required",
+        "agent_id": "agent-document-reviewer",
+        "tool_id": "tool-plan-document-processing",
+        "endpoint": "POST http://document-reviewer:8089/plan_processing"
+      },
+      "actual_output": {
+        "stored_as": "state.results.processing_plan",
+        "file_pattern": "OUTPUT/ProcessingPlan_<timestamp>.json",
+        "key_used_by_next_step": "processing_plan"
+      }
+    },
+    {
+      "step_number": 3,
+      "step_id": "step-extract-site-plan-data",
+      "step_name": "Extract Site Plan Data",
+      "summary": "For each matched site plan document, extract all data fields from the Substation Notes annotations, applying the conditional HV Switchgear rule where required. Each extracted value is linked to its source drawing and annotation location.",
+      "details": "Using the processing plan from Step 2, each matched site plan document is read using the tool specified in processing_tool_id (e.g. tool-extract-pdf-content, or OCR if conversion was flagged). The extracted content is passed to an LLM which locates the Substation Notes table or callout on the drawing and extracts each required field as a dedicated sub-step. The conditional rule for HV Switchgear is evaluated during extraction: if transformer size is 1.5MVA, HV Switchgear is set to 'Siemens RLR' and the override flag is set to true. Each extracted field records the source drawing, annotation label, and extracted value.",
+      "sub_steps": [
+        {
+          "sub_step_number": 1,
+          "sub_step_id": "sub-step-extract-siteplan-substation",
+          "sub_step_name": "Extract Substation Asset Information",
+          "details": "Locate the Substation Notes annotation block on the site plan drawing and extract the Substation Asset Number and any associated asset type or location descriptor. The asset number is a unique identifier assigned by the network operator to the substation asset.",
+          "instructional_sub_steps": [
+            {
+              "title": "Locate Substation Notes",
+              "instructions": "Search the site plan for annotations labelled 'Substation Notes', 'Sub Notes', or similar. These are typically found in a table or callout box on the drawing, often positioned near the substation symbol or in the drawing title block area. Extract full sentences."
+            },
+            {
+              "title": "Extract Asset Number",
+              "instructions": "Identify and extract the Substation Asset Number from the substation notes. This is a unique identifier for the substation asset, typically a numeric or alphanumeric code assigned by the network operator (e.g., S1234, 123456). Extract full sentences."
+            },
+            {
+              "title": "Note Asset Type and Location",
+              "instructions": "Record the substation type (e.g., Pole Sub, Padmount, Kiosk) and any reference number or location descriptor (e.g., street address, lot number, or pole reference) noted in or adjacent to the Substation Notes block. Extract full sentences."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 2,
+          "sub_step_id": "sub-step-extract-siteplan-transformer",
+          "sub_step_name": "Extract Transformer Specifications",
+          "details": "Extract the transformer rated capacity from the Substation Notes on the site plan. The transformer size is a critical input to the conditional HV Switchgear rule applied in sub-step 3: if the transformer size is 1.5MVA, HV Switchgear must be recorded as Siemens RLR regardless of the drawing annotation.",
+          "instructional_sub_steps": [
+            {
+              "title": "Locate Transformer Size",
+              "instructions": "Find the 'Transformer Size', 'TX Size', or 'Transformer Rating' field in the substation notes table. Extract the rated capacity (e.g., 1.5MVA, 500kVA, 1000kVA). Extract full sentences."
+            },
+            {
+              "title": "Apply Conditional HV Switchgear Rule",
+              "instructions": "Note the transformer size carefully. If the transformer size is 1.5MVA, flag that HV Switchgear must be Siemens RLR (do not rely on what is written in the drawing for HV Switchgear in this case). Otherwise, extract HV Switchgear from the document as written. This flag will be applied during sub-step 3. Extract full sentences."
+            },
+            {
+              "title": "Record Rating Units",
+              "instructions": "Ensure the rating is captured with correct units (MVA or kVA). Convert if necessary to maintain consistency — note that 1.5MVA equals 1500kVA. The exact unit as written on the drawing should be recorded alongside any converted value. Extract full sentences."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 3,
+          "sub_step_id": "sub-step-extract-siteplan-hv-switchgear",
+          "sub_step_name": "Extract HV Switchgear Details",
+          "details": "Extract the HV Switchgear type and make from substation notes, applying the conditional rule: if transformer size is 1.5MVA, HV Switchgear must be Siemens RLR regardless of what is noted in the drawing.",
+          "instructional_sub_steps": [
+            {
+              "title": "Read HV Switchgear Field",
+              "instructions": "Locate the 'HV Switchgear', 'HV SW', or 'High Voltage Switchgear' field in the substation notes. Read the make and model recorded on the drawing. Extract full sentences."
+            },
+            {
+              "title": "Apply 1.5MVA Conditional Rule",
+              "instructions": "If the transformer size (from sub-step 2) is 1.5MVA, override the drawn HV Switchgear value and record 'Siemens RLR'. Set hv_switchgear_override_applied to true and add a note: 'Overridden per 1.5MVA rule — Siemens RLR required.' If transformer size is not 1.5MVA, extract the HV Switchgear exactly as written on the drawing and set hv_switchgear_override_applied to false. Extract full sentences."
+            },
+            {
+              "title": "Capture Switchgear Reference",
+              "instructions": "Record any switchgear reference numbers, cubicle numbers, or ring main unit (RMU) references associated with the HV switchgear noted on the drawing or in adjacent annotations. Extract full sentences."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 4,
+          "sub_step_id": "sub-step-extract-siteplan-voltage",
+          "sub_step_name": "Extract Voltage Level",
+          "details": "Extract the operating voltage level from substation notes on the site plan. The voltage level defines the HV network operating voltage at which the substation is connected and is typically expressed in kilovolts (kV). Extract full sentences.",
+          "instructional_sub_steps": [
+            {
+              "title": "Locate Voltage Level Field",
+              "instructions": "Find the 'Voltage Level', 'Operating Voltage', or 'Nominal Voltage' field in the substation notes. This is typically expressed in kV (e.g., 11kV, 22kV, 33kV). Extract full sentences."
+            },
+            {
+              "title": "Cross-reference with HV Network",
+              "instructions": "Verify the voltage level against any HV network markings on the drawing (e.g., '11kV feeder', '22kV ring main', feeder labels on HV cable routes). If a discrepancy exists between the substation notes and the network markings, record both values and flag for review."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 5,
+          "sub_step_id": "sub-step-extract-siteplan-lv-switchgear",
+          "sub_step_name": "Extract LV Switchgear Details",
+          "details": "Extract the LV Switchgear type and specification from substation notes on the site plan. LV switchgear is the low voltage distribution switchboard or panel installed within the substation to distribute power to downstream LV circuits.",
+          "instructional_sub_steps": [
+            {
+              "title": "Locate LV Switchgear Field",
+              "instructions": "Find the 'LV Switchgear', 'LV SW', or 'Low Voltage Switchgear' field in the substation notes table."
+            },
+            {
+              "title": "Extract Make and Model",
+              "instructions": "Record the LV switchgear make, model, and any rating information (e.g., amps, number of poles, busbar rating). Note any manufacturer-specific designations or type codes as written on the drawing."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 6,
+          "sub_step_id": "sub-step-extract-siteplan-cubicle",
+          "sub_step_name": "Extract Cubicle Size",
+          "details": "Extract the cubicle size specification from substation notes on the site plan. The cubicle size defines the physical enclosure dimensions or type code for the switchgear housing and is used to verify site space allocation and civil works requirements.",
+          "instructional_sub_steps": [
+            {
+              "title": "Locate Cubicle Size Field",
+              "instructions": "Find the 'Cubicle Size', 'Cubicle Dimensions', or 'Enclosure Size' field in the substation notes. This may be expressed as dimensions (e.g., 2400x600x2000mm) or as a type code or model designation."
+            },
+            {
+              "title": "Note Cubicle Type",
+              "instructions": "Record whether the cubicle is indoor or outdoor rated, and any associated mounting, installation, or environmental protection notes (e.g., IP rating, weatherproof, pad-mounted). Note any civil base or plinth dimensions if stated alongside the cubicle size."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 7,
+          "sub_step_id": "sub-step-extract-siteplan-earthing",
+          "sub_step_name": "Extract Earthing Information",
+          "details": "Extract earthing system details from substation notes and site plan markups. Earthing information captures the type and specification of the earthing system provided for the substation assets, including any compliance standards referenced.",
+          "instructional_sub_steps": [
+            {
+              "title": "Locate Earthing Field",
+              "instructions": "Find the 'Earthing', 'Earth', or 'Earthing System' field in the substation notes. Note any earthing type (e.g., earth rod, earth mat, earth grid) and resistance values or design criteria (e.g., <1 ohm, <10 ohm) if stated."
+            },
+            {
+              "title": "Check Site Plan Markups",
+              "instructions": "Look for earthing symbols (earth electrode symbol) on the site plan drawing to identify earthing locations for the substation and associated assets. Note the positions and any interconnection between earthing points."
+            },
+            {
+              "title": "Note Compliance Requirements",
+              "instructions": "Record any compliance standards referenced for earthing in the substation notes or drawing general notes (e.g., MDI0031, AS/NZS 3000, network operator earthing design guidelines). Flag if an earthing design report or test results are required."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 8,
+          "sub_step_id": "sub-step-extract-siteplan-notes",
+          "sub_step_name": "Extract Design Drawing Notes",
+          "details": "Identify and capture all textual engineering notes and annotations present on the design drawing. These notes often contain critical compliance, safety, and construction specifications not found in the primary data fields[cite: 160].",
+          "instructional_sub_steps": [
+            {
+              "title": "Locate Notes on Design Drawing",
+              "instructions": "Scan the design drawing for a dedicated 'NOTES' section or block of technical annotations. Read and extract all individual notes listed under this heading to ensure no specific construction or regulatory requirements are overlooked."
+            },
+            {
+              "title": "Identify Compliance Standards",
+              "instructions": "Record all network standards referenced within the notes, specifically looking for compliance with MDI0031 and MCI0005. Note any requirements to adhere to the Connection Policy, Model Standing Offers, or the NSW Service and Installation Rules."
+            },
+            {
+              "title": "Extract Task-Specific Annotations",
+              "instructions": "Look for hand-written or red-line markups that modify or clarify the standard notes, such as specific cable types like 'NEW 240M XEE HV Cable' or 'New OH 7/4.5AMG'. Document any project-specific instructions such as 'Remove span between' or 'New Sub by ARP 4764'."
+            }
+          ]
+        }
+      ],
+      "expected_input": {
+        "description": "The ProcessingPlan from Step 2 indicating which tool to use per site plan document, and the document files themselves.",
+        "fields": {
+          "processing_plan": "Array of processing entries from Step 2 output",
+          "documents_folder": "Folder path containing the actual site plan document files"
+        }
+      },
+      "expected_output": {
+        "description": "Structured site plan data extracted from the substation notes of each matched site plan document, with conditional rule outcomes recorded.",
+        "fields": {
+          "site_plan_data": {
+            "substation_asset_number": "Unique identifier for the substation asset as extracted from the Substation Notes",
+            "transformer_size": "Transformer rated capacity with units as written (e.g., 1.5MVA, 500kVA)",
+            "hv_switchgear": "HV Switchgear make and model — set to 'Siemens RLR' if transformer size is 1.5MVA, otherwise extracted from drawing",
+            "hv_switchgear_override_applied": "Boolean — true if the 1.5MVA conditional rule was applied to override the drawn HV Switchgear value",
+            "voltage_level": "Operating voltage level in kV (e.g., 11kV, 22kV)",
+            "lv_switchgear": "LV Switchgear make, model, and rating as extracted from substation notes",
+            "cubicle_size": "Cubicle dimensions or type code as extracted from substation notes",
+            "earthing": "Earthing system type, resistance criteria, and compliance standards as extracted from substation notes"
+          },
+          "source_documents": "Array of document filenames that contributed to the extracted site plan data"
+        }
+      },
+      "actual_input": {
+        "source": "Automatically passed from Step 2 processing_plan; documents read via tool-extract-pdf-content",
+        "agent_id": "agent-document-extractor",
+        "tool_id": "tool-extract-pdf-content",
+        "endpoint": "Internal function: extract_pdf_content"
+      },
+      "actual_output": {
+        "stored_as": "state.results.site_plan_data",
+        "file_pattern": "OUTPUT/SitePlanExtract_<timestamp>.json"
+      }
+    }
+  ],
+  "consolidated_output": {
+    "description": "A single consolidated JSON combining all site plan data extracted from the document package.",
+    "file_pattern": "OUTPUT/SitePlanReport_<timestamp>.json",
+    "structure": {
+      "process_id": "proc-extract-site-plan-info",
+      "run_timestamp": "ISO8601 datetime",
+      "source_documents": [],
+      "site_plan_data": {
+        "substation_asset_number": null,
+        "transformer_size": null,
+        "hv_switchgear": null,
+        "hv_switchgear_override_applied": false,
+        "voltage_level": null,
+        "lv_switchgear": null,
+        "cubicle_size": null,
+        "earthing": null
+      }
+    }
+  }
+}

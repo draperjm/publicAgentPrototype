@@ -1,0 +1,17 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependency for pdfplumber
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpoppler-cpp-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements_document_reviewer.txt .
+RUN pip install --no-cache-dir -r requirements_document_reviewer.txt
+
+COPY document_reviewer.py .
+
+EXPOSE 8089
+
+CMD ["uvicorn", "document_reviewer:app", "--host", "0.0.0.0", "--port", "8089"]

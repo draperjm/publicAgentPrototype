@@ -1,0 +1,449 @@
+{
+  "process_id": "proc-extract-design-brief-info",
+  "process_name": "Extract Information from Design Brief",
+  "version": "1.0",
+  "worker_id": "dw-junior-engineer",
+  "worker_name": "Junior Engineer",
+  "summary": "Review and extract key engineering and funding information from a submitted design brief document package. The process identifies all submitted documents, reads each matched document, and extracts structured data covering supply requirements (HV, LV, SL, Earthing, Easements, and Substation) and determination of funding requirements, producing a structured JSON output per document and a consolidated process output.",
+  "search_context": "Design brief documents for a customer connections application submitted to ACME Energy. Target documents include: project design briefs (PDF documents containing a 'Method of Supply Requirement' section and a 'Determination of Funding Requirements' section), customer connection offer documents, and any associated architectural, services, or town planning reports. Key filename indicators: documents with 'DESIGN_BRIEF', 'BRIEF', or 'ARP' (ACME Energy project reference) in the filename. Key content indicators: structured sections covering HV Works, LV Works, SL Works, Earthing, Easements, Substation works, and a funding determination table listing items with responsible party and funding category. Exclude: reticulation drawings and engineering drawing files identified by 'RETIC' or 'DWG' in the filename — these are Site Plan documents and must be assigned document_category 'Site Plan'.",
+  "process_input": {
+    "description": "A folder containing the design brief document package for a project, including all relevant PDFs and supporting documents submitted by the applicant.",
+    "format": "Folder path containing PDF, DOCX, or other supported document types",
+    "example": "/documents/DAR1509-84/",
+    "required_fields": [
+      "folder_path"
+    ]
+  },
+  "process_output": {
+    "description": "A structured JSON object containing the extracted supply requirements and funding determination items from the design brief, linked to the source document and section.",
+    "format": "JSON",
+    "required_fields": [
+      "project_number",
+      "project_name",
+      "supply_requirements",
+      "funding_requirements"
+    ]
+  },
+  "document_categorisation": {
+    "description": "Rules for identifying and categorising a document as a 'Design Brief' document. When Step 2 (Plan Document Processing Approach) assigns a 'document_category' field to each entry in the processing plan, it must apply these rules. A document must satisfy at least two positive indicators and must not satisfy any negative indicators to be categorised as 'Design Brief'.",
+    "category": "Design Brief",
+    "positive_indicators": {
+      "filename_patterns": [
+        "Contains 'BRIEF' or 'brief' (e.g. DESIGN_BRIEF, Design_Brief)",
+        "Contains 'DB' as a standalone component of the filename",
+        "Contains 'ARP' followed by a project number (typical ACME Energy design brief naming convention)",
+        "Contains 'DESIGN' in conjunction with project or ARP references",
+        "Contains 'architectural', 'services', 'structural', or 'town_planning'"
+      ],
+      "document_type_values": [
+        "Design Brief",
+        "Architectural Brief",
+        "Services Brief",
+        "Structural Brief",
+        "Town Planning Report",
+        "Connection Offer",
+        "Customer Connection Brief"
+      ],
+      "content_keywords": [
+        "Method of Supply Requirement",
+        "Method of Supply",
+        "Determination of Funding Requirements",
+        "HV Works",
+        "LV Works",
+        "SL Works",
+        "Earthing",
+        "Easements",
+        "Land Interests",
+        "Substation & Switching Station Works",
+        "Supply Requirement",
+        "Connection Offer Number",
+        "Applicant",
+        "Network Operator",
+        "ACME Energy"
+      ],
+      "structural_indicators": [
+        "Contains a structured table of supply requirements across HV, LV, SL, Earthing categories",
+        "Contains a funding determination section listing items with responsible party and funding category",
+        "Is a text-based PDF document (not a drawing or diagram)",
+        "Contains project metadata fields: project name, project number, applicant name, date"
+      ]
+    },
+    "negative_indicators": {
+      "description": "If any of these are present, the document must NOT be categorised as 'Design Brief' — classify it as 'Site Plan' instead.",
+      "filename_patterns": [
+        "Contains 'RETIC' or 'retic' (indicates a reticulation drawing)",
+        "Contains 'DWG' (indicates an engineering drawing file)",
+        "Contains 'SITEPLAN' or 'site_plan'",
+        "Contains 'SUBSTATION' or 'substation' as the primary descriptor (not as a section heading within a brief)"
+      ],
+      "document_type_values": [
+        "Reticulation Drawing",
+        "Electrical Network Diagram",
+        "Site Plan Drawing",
+        "Substation Drawing",
+        "Network Diagram",
+        "Engineering Drawing"
+      ],
+      "content_keywords": [
+        "Substation Notes",
+        "Sub Notes",
+        "HV Switchgear (as an extracted annotation field in a drawing table)",
+        "Transformer Size (as an annotation in a drawing callout)",
+        "Cubicle Size (as a drawing annotation field)"
+      ]
+    },
+    "decision_rule": "If the document contains a 'Method of Supply' or 'Determination of Funding Requirements' section, classify as 'Design Brief'. If it contains a 'Substation Notes' annotation table or is a technical engineering drawing, classify as 'Site Plan'. When uncertain, prefer 'Design Brief' for text-based documents and 'Site Plan' for drawing/diagram files."
+  },
+
+  "steps": [
+    {
+      "step_number": 1,
+      "step_id": "step-identify-documents",
+      "step_name": "Identify and Review Design Brief Documents",
+      "summary": "Scan the submitted document package folder, assess each file against the design brief search context, and produce a structured list of matched documents with extracted metadata. Identifies which documents are relevant and classifies each by type.",
+      "details": "Upload the design brief package folder path to the Document Reviewer Agent. The agent lists all files in the folder, assesses each filename for relevance using an LLM, reads file content for matched candidates, and performs a content match analysis. Returns a ranked list of matched documents with metadata including document title, type, author, date, project name, and project number. Only documents with overall_confidence > 0.5 are included in the matched documents list. The output file is saved to the OUTPUT directory.",
+      "expected_input": {
+        "description": "A folder path containing the design brief document package.",
+        "fields": {
+          "folder_path": "Absolute path to the folder containing documents (e.g. /documents/DAR1509-84/)",
+          "search_context": "Description of the document types being searched for (generated from task definition)"
+        }
+      },
+      "expected_output": {
+        "description": "A DocumentReview JSON file listing all matched documents with metadata and quality indicators.",
+        "fields": {
+          "documents": "Array of matched document objects, each with filename, document_title, document_type, author, date, project_name, project_number, revision, confidence, content_type, text_quality, and recommended_reader",
+          "scan_results": "Full scan results for all files including those not matched",
+          "matched_files": "Integer count of matched files",
+          "total_files_scanned": "Integer count of all files scanned",
+          "output_file": "Path to the saved DocumentReview_*.json file"
+        }
+      },
+      "actual_input": {
+        "source": "User-provided folder path via the frontend folder prompt",
+        "agent_id": "agent-document-reviewer",
+        "tool_id": "tool-list-folder-files",
+        "endpoint": "POST http://document-reviewer:8089/review"
+      },
+      "actual_output": {
+        "stored_as": "state.results.document_review",
+        "file_pattern": "OUTPUT/DocumentReview_<timestamp>.json",
+        "key_used_by_next_step": "output_file"
+      }
+    },
+    {
+      "step_number": 2,
+      "step_id": "step-plan-document-processing",
+      "step_name": "Plan Document Processing Approach",
+      "summary": "Read the Step 1 document review output and the tool registry to determine the best processing tool for each matched document, whether format conversion is needed, and the extraction method to use.",
+      "details": "The Document Processing Planner reads the Step 1 DocumentReview output file and the registry.json. For each document in the matched list, it uses an LLM to assess the document's content_type and text_quality and selects the most appropriate processing tool from the registry. If a document is image-based or has no extractable text (text_quality = none), conversion to PNG for OCR is flagged as required. Outputs a ProcessingPlan JSON file with one entry per document.",
+      "expected_input": {
+        "description": "The Step 1 DocumentReview output file path, automatically retrieved from the orchestrator state.",
+        "fields": {
+          "step1_output_file": "Path to the DocumentReview_*.json file produced by Step 1"
+        }
+      },
+      "expected_output": {
+        "description": "A ProcessingPlan JSON file with a processing entry per matched document.",
+        "fields": {
+          "processing_plan": "Array of processing entries, each with: filename, document_type, content_type, text_quality, recommended_reader, processing_tool_id, conversion_required, conversion_type, extraction_method, processing_notes",
+          "total_documents": "Integer count of entries in processing_plan",
+          "output_file": "Path to the saved ProcessingPlan_*.json file"
+        }
+      },
+      "actual_input": {
+        "source": "Automatically passed from Step 1 output — no user input required",
+        "agent_id": "agent-document-reviewer",
+        "tool_id": "tool-plan-document-processing",
+        "endpoint": "POST http://document-reviewer:8089/plan_processing"
+      },
+      "actual_output": {
+        "stored_as": "state.results.processing_plan",
+        "file_pattern": "OUTPUT/ProcessingPlan_<timestamp>.json",
+        "key_used_by_next_step": "processing_plan"
+      }
+    },
+    {
+      "step_number": 3,
+      "step_id": "step-extract-supply-requirements",
+      "step_name": "Extract Supply Requirements from Design Brief",
+      "summary": "For each matched design brief document, extract all supply requirement information including HV, LV, SL, Earthing, Easements, and Substation requirements. Each item is linked to its source document and section.",
+      "details": "Using the processing plan from Step 2, each matched document is read using the tool specified in processing_tool_id (e.g. tool-extract-pdf-content). The extracted sections are passed to an LLM which identifies and extracts all supply-related requirements across six categories, each handled as a dedicated sub-step. Each extracted requirement records the source section, page number, and verbatim or summarised requirement text.",
+      "sub_steps": [
+        {
+          "sub_step_number": 1,
+          "sub_step_id": "sub-step-extract-hv",
+          "sub_step_name": "Extract High Voltage (HV) Requirements",
+          "details": "Identify and consolidate all High Voltage (HV) information by navigating technical requirements, visual markups, and funding determinations.",
+          "instructional_sub_steps": [
+            {
+              "title": "Locate Primary HV Method of Supply (MOS)",
+              "instructions": "Review the 'Method of Supply Requirement' section. Identify: 1) Removal of Assets (e.g., OH HV cables between specific pole refs). 2) Installation of Assets (e.g., new OH HV cable locations). 3) Voltage Specifics (verify line types as HV or LV, checking for mislabeled requirements in LV sections)."
+            },
+            {
+              "title": "Review Visual HV Markups and Annotations",
+              "instructions": "Examine the site sketch. Cross-reference text with visual data to identify: 1) Cable Specifications (e.g., 'NEW 240M XEE HV Cable' or 'New OH 7/4.5AMC'). 2) Connection Points (e.g., '2-UGOH Poles'). 3) Substation Context (e.g., 'New Sub' locations)."
+            },
+            {
+              "title": "Identify HV Infrastructure Funding and Materials",
+              "instructions": "Determine financial responsibilities. Identify: 1) Reimbursements (e.g., Spare HV duct capital contributions). 2) Customer Charges (e.g., Duct usage charges). 3) Contestability (e.g., Network switching or substation commissioning)."
+            },
+            {
+              "title": "Verify Compliance Standards",
+              "instructions": "Ensure HV design meets mandatory codes. Verify requirements for compliance with MDI0031, MCI0005, and NSW Service and Installation Rules."
+            },
+            {
+              "title": "Consolidate all High Voltage Information",
+              "instructions": "Group and format all information which relates to High Voltage actions, materials, standards, markups and methods of supply into a single category High Voltage (HV)."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 2,
+          "sub_step_id": "sub-step-extract-lv",
+          "sub_step_name": "Extract Low Voltage (LV) Requirements",
+          "details": "Based on the provided Design Brief (DAR1509), here are the instructions to locate all information specifically regarding Low Voltage (LV) works for the Elizabeth Street project:",
+          "instructional_sub_steps": [
+            {
+              "title": "Identify the LV Works Section",
+              "instructions": "Navigate to the section of the document under the heading Method of Supply Requirement. Locate the sub-heading LV Works to find the specific scope of electrical adjustments."
+            },
+            {
+              "title": "Review Removal and Installation Requirements",
+              "instructions": "Find the instruction to remove the Overhead (OH) LV cable currently located between pole ref '23' and pole ref '20' on the southern side of Elizabeth Drive. Note the requirement to string a new OH cable between pole ref '3' and pole ref '20' on the northern side of Elizabeth Drive. Note: While the brief label for this specific bullet point mentions 'HV cable,' it is categorized strictly under the 'LV Works' section."
+            },
+            {
+              "title": "Consult the Visual Sketch",
+              "instructions": "Refer to the diagram to visualize the physical path of the LV asset relocation. Look for the legend or mark-ups indicating 'Remove OH' and 'New OH' to see how the LV lines interact with the northern and southern sides of the road."
+            },
+            {
+              "title": "Verify Compliance Standards",
+              "instructions": "Ensure all LV service works comply with the NSW Service and Installation Rules. Confirm the design adheres to ACME Energy standards MDI0031 and MCI0005."
+            },
+            {
+              "title": "Check Service Connections",
+              "instructions": "Locate the General section regarding the 'New OH road crossing service connection' intended to maintain existing services."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 3,
+          "sub_step_id": "sub-step-extract-sl",
+          "sub_step_name": "Extract Street Lighting (SL) Requirements",
+          "details": "Identify and extract all Street Lighting (SL) information by reviewing specialized work sections and visual indicators.",
+          "instructional_sub_steps": [
+            {
+              "title": "Identify the SL Works Section",
+              "instructions": "Locate the 'SL Works' sub-heading under the Method of Supply Requirement section. Identify specific tasks such as 'Remove SL' and 'Install new SL'."
+            },
+            {
+              "title": "Cross-reference with Visual Markups",
+              "instructions": "Examine the provided sketch for markers or annotations specifically relating to street lighting assets. Verify if SL locations are tied to specific pole references mentioned in HV or LV sections."
+            },
+            {
+              "title": "Check for SL Material Funding",
+              "instructions": "Review the funding determination section to see if Street Lighting materials are 'ACME Energy Supplied' or if they fall under 'Customer Funded Contestable Works'."
+            },
+            {
+              "title": "Verify SL Standard Compliance",
+              "instructions": "Ensure extraction captures any requirement for SL works to comply with specific public lighting standards or council requirements mentioned in the text."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 4,
+          "sub_step_id": "sub-step-extract-earthing",
+          "sub_step_name": "Extract Earthing Requirements",
+          "details": "Extract all technical requirements regarding grounding and earthing systems for the proposed electrical assets.",
+          "instructional_sub_steps": [
+            {
+              "title": "Locate Earthing Technical Requirements",
+              "instructions": "Search the Design Brief for keywords 'Earthing', 'Grounding', or 'Earth Mat'. Identify requirements for earthing at new substation or switching station locations."
+            },
+            {
+              "title": "Identify Specific Earthing Standards",
+              "instructions": "Extract references to mandatory earthing standards (e.g., MDI or MCI series) that must be met during the detailed design phase."
+            },
+            {
+              "title": "Check Substation Specific Earthing",
+              "instructions": "Review the 'Substation & Switching Station Works' section to determine if specific earthing configurations are required for the new pole substation or padmount substation."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 5,
+          "sub_step_id": "sub-step-extract-easements",
+          "sub_step_name": "Extract Easement Requirements",
+          "details": "Identify and document all land interest, easement, and property access requirements specified in the brief.",
+          "instructional_sub_steps": [
+            {
+              "title": "Locate Land Interest Guidelines",
+              "instructions": "Identify the 'Land Interests' section in the brief. Verify if the checkbox for 'NA' is selected or if land interests are required for the project."
+            },
+            {
+              "title": "Identify Required Easements",
+              "instructions": "Extract details regarding required easements for new HV/LV lines or substation sites. Note any reference to the 'Land Interest Guidelines (LIG)'."
+            },
+            {
+              "title": "Check for Property Access Conditions",
+              "instructions": "Document any specific conditions regarding access to private property or the creation of right-of-ways for ACME Energy assets."
+            }
+          ]
+        },
+        {
+          "sub_step_number": 6,
+          "sub_step_id": "sub-step-extract-substation",
+          "sub_step_name": "Extract Substation Requirements",
+          "details": "Capture all specifications and requirements for the removal, installation, or modification of substation assets.",
+          "instructional_sub_steps": [
+            {
+              "title": "Locate Substation Works Section",
+              "instructions": "Identify the 'Substation & Switching Station Works' sub-heading. Record specific actions like 'Remove Pole Sub' or 'Install New Pole Sub' at specific references."
+            },
+            {
+              "title": "Extract Technical Ratings and References",
+              "instructions": "Document any stated ratings (e.g., kVA) or specific equipment references (e.g., 'ref 9' or 'ref 29') for the substation assets."
+            },
+            {
+              "title": "Identify Substation Commissioning Responsibilities",
+              "instructions": "Review the funding section to determine if 'substation commissioning' is categorized as a 'Customer Funded Non-Contestable Work'."
+            },
+            {
+              "title": "Verify Substation Clearances and Standards",
+              "instructions": "Capture requirements for physical clearances or compliance with substation design standards like MDI0031 mentioned in the compliance section."
+            }
+          ]
+        }
+      ],
+      "expected_input": {
+        "description": "The ProcessingPlan from Step 2 indicating which tool to use per document, and the document files themselves.",
+        "fields": {
+          "processing_plan": "Array of processing entries from Step 2 output",
+          "documents_folder": "Folder path containing the actual document files"
+        }
+      },
+      "expected_output": {
+        "description": "Structured supply requirements extracted from the design brief documents.",
+        "fields": {
+          "supply_requirements": {
+            "hv": "Array of High Voltage requirement objects — each with section, page, and requirement text",
+            "lv": "Array of Low Voltage requirement objects",
+            "sl": "Array of Street Lighting requirement objects",
+            "earthing": "Array of Earthing requirement objects",
+            "easements": "Array of Easement requirement objects",
+            "substation": "Array of Substation requirement objects"
+          },
+          "source_documents": "Array of document filenames that contributed to the extracted requirements"
+        }
+      },
+      "actual_input": {
+        "source": "Automatically passed from Step 2 processing_plan; documents read via tool-extract-pdf-content",
+        "agent_id": "agent-document-reviewer",
+        "tool_id": "tool-extract-pdf-content",
+        "endpoint": "Internal function: extract_pdf_content"
+      },
+      "actual_output": {
+        "stored_as": "state.results.supply_requirements",
+        "file_pattern": "OUTPUT/SupplyRequirements_<timestamp>.json"
+      }
+    },
+    {
+      "step_number": 4,
+      "step_id": "step-extract-funding-requirements",
+      "step_name": "Extract Determination of Funding Requirements",
+      "summary": "For each matched design brief document, extract all items listed under the Determination of Funding Requirements section, capturing each funding line item with its description, amount (if stated), responsibility party, and source section.",
+      "details": "Using the section-level extracted content from Step 3 (or re-reading the document if needed), an LLM is prompted to identify and extract all content under the 'Determination of Funding Requirements' heading or equivalent section. The LLM extracts each listed item individually, recording: item description, funding category (e.g. capital contribution, non-contestable, contestable), responsible party (e.g. applicant, network operator), monetary amount or formula if stated, and the source section and page. The output is a structured funding requirements list linked to the source document.",
+      "sub_steps": [
+        {
+          "sub_step_number": 1,
+          "sub_step_id": "sub-step-extract-funding-determination",
+          "sub_step_name": "Extract Determination of Funding Items",
+          "details": "Prompt the LLM to identify and extract all items listed under the 'Determination of Funding Requirements' section or equivalent heading. For each item record: item_description (verbatim or paraphrased), funding_category (e.g. capital contribution, non-contestable, contestable), responsible_party (e.g. applicant, network operator), amount_or_formula (monetary amount or formula if stated), source_section, and source_page."
+        },
+        {
+          "sub_step_number": 2,
+          "sub_step_id": "sub-step-extract-funding-ancillary-fees",
+          "sub_step_name": "Extract Ancillary Network Services Fees",
+          "details": "Prompt the LLM to identify and extract all line items listed under 'Ancillary Network Services Fees', 'Payment Advice', or 'Pro Forma Tax Invoice' sections. For each fee record: item_description (e.g. Standard Connection Offer Fee, Design Information Fee), date, amount (dollar value), and source_section and source_page. Also capture the total amount payable if stated."
+        },
+        {
+          "sub_step_number": 3,
+          "sub_step_id": "sub-step-extract-payment-instructions",
+          "sub_step_name": "Extract Payment Instructions and Methods",
+          "details": "Identify and consolidate all logistics required for the applicant to remit payment to ACME Energy. [cite: 93]",
+          "instructional_sub_steps": [
+            {
+              "title": "Identify Preferred Payment Method",
+              "instructions": "Locate the preferred payment channel, specifically identifying EFT as the primary method. [cite: 94]"
+            },
+            {
+              "title": "Extract Banking Details",
+              "instructions": "Capture the specific financial coordinates provided, including the BSB (012-003) and Account Number (8376 89858). [cite: 94]"
+            },
+            {
+              "title": "Identify Mandatory Transaction References",
+              "instructions": "Locate the unique alphanumeric reference code (e.g., DAR1509A2) that must be quoted in the EFT transaction field. [cite: 95]"
+            },
+            {
+              "title": "Document Remittance and Restriction Requirements",
+              "instructions": "Identify the email for remittance copies (remittances@ACMEenergy.com.au) and note that credit cards and cheques are not accepted. [cite: 95, 96]"
+            },
+            {
+              "title": "Capture Invoice Policy",
+              "instructions": "Note the condition for receiving a formal Tax Invoice following the receipt of payment. [cite: 97]"
+            }
+          ]
+        }
+      ],
+      "expected_input": {
+        "description": "The extracted section content from Step 3 (or the raw document content), along with the matched document list.",
+        "fields": {
+          "extracted_sections": "Section-level content from Step 3 tool output (text, tables per section)",
+          "documents": "Matched document list from Step 1"
+        }
+      },
+      "expected_output": {
+        "description": "Structured funding determination items extracted from the design brief.",
+        "fields": {
+          "funding_requirements": {
+            "items": "Array of funding requirement objects — each with: item_description, funding_category, responsible_party, amount_or_formula, source_section, source_page, source_document",
+            "total_items": "Integer count of extracted funding items"
+          }
+        }
+      },
+      "actual_input": {
+        "source": "Extracted section content from tool-extract-pdf-content output or direct document re-read",
+        "agent_id": "agent-document-reviewer",
+        "tool_id": "tool-extract-pdf-content",
+        "endpoint": "Internal function: extract_pdf_content"
+      },
+      "actual_output": {
+        "stored_as": "state.results.funding_requirements",
+        "file_pattern": "OUTPUT/FundingRequirements_<timestamp>.json"
+      }
+    }
+  ],
+  "consolidated_output": {
+    "description": "A single consolidated output JSON combining the results of all steps for the process run.",
+    "file_pattern": "OUTPUT/DesignBriefExtract_<timestamp>.json",
+    "structure": {
+      "process_id": "proc-extract-design-brief-info",
+      "run_timestamp": "ISO8601 datetime",
+      "project_number": "Extracted project number (e.g. DAR1509)",
+      "project_name": "Extracted project name",
+      "source_documents": "Array of matched document filenames",
+      "supply_requirements": {
+        "hv": [],
+        "lv": [],
+        "sl": [],
+        "earthing": [],
+        "easements": [],
+        "substation": []
+      },
+      "funding_requirements": {
+        "items": [],
+        "total_items": 0
+      }
+    }
+  }
+}

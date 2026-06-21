@@ -1,0 +1,327 @@
+{
+  "digital_workers": [
+    {
+      "worker_id": "dw-junior-engineer",
+      "name": "Junior Engineer",
+      "description": "Handles routine engineering review tasks including design brief analysis, drawing checks, and document compliance.",
+      "jobs": [
+        {
+          "job_id": "job-review-design-brief",
+          "name": "Review Design Brief",
+          "description": "End-to-end review of a project design brief to confirm all required documents are present, correctly classified, and meet minimum content standards.",
+          "tasks": [
+            {
+              "task_id": "task-review-identify-design-brief-docs",
+              "template_id": "tmpl-jr-review-identify-design-brief-docs",
+              "name": "Review and Identify Design Brief Documents",
+              "description": "Upload the design brief package and identify all submitted documents. Extract key metadata, classify each document by type, and flag any missing or incomplete items against standard brief requirements.",
+              "triggers": [
+                "review design brief",
+                "design brief check",
+                "identify brief documents",
+                "brief review",
+                "design brief audit"
+              ],
+              "estimated_duration": "6m",
+              "steps": [
+                {
+                  "step_number": 1,
+                  "name": "Extract and analyse design brief documents",
+                  "description": "Upload the design brief package (PDF, DOCX, or ZIP of documents) to the Content Reviewer Agent. Extract key metadata from each document including document title, document type (e.g. Architectural Brief, Structural Brief, Services Brief, Town Planning Report), author, date, project name, and project number. Produce a structured list of all identified documents.",
+                  "required_resources": {
+                    "agent_id": "agent-document-reviewer",
+                    "tool_id": "tool-list-folder-files",
+                    "knowledge_id": null
+                  },
+                  "validation": {
+                    "criteria": "Must return a JSON object with a 'documents' key containing a list of items, each with 'document_title', 'document_type', 'author', 'date', and 'project_name'.",
+                    "retry_on_failure": true,
+                    "max_retries": 3
+                  }
+                },
+                {
+                  "step_number": 2,
+                  "name": "Plan document processing approach",
+                  "description": "Read the Step 1 document review output file and the tool registry. For each identified document, determine which tool to use to extract or process it based on document type, content resolution quality (text vs image-based), and available tools. Determine whether format conversion is required (e.g. convert a scanned PDF to PNG for OCR). Produce a structured processing plan for each document.",
+                  "required_resources": {
+                    "agent_id": "agent-document-reviewer",
+                    "tool_id": "tool-plan-document-processing",
+                    "knowledge_id": null
+                  },
+                  "validation": {
+                    "criteria": "Must return a JSON object with: (1) a 'processing_plan' key â€” a list where each entry has: 'filename' (matching a document from the Step 1 DocumentReview output file), 'document_type' (string), 'content_type' (one of: text, image, unsupported, error), 'text_quality' (one of: high, low, none), 'recommended_reader' (string), 'processing_tool_id' (a valid tool ID from the registry, e.g. tool-extract-pdf-content or tool-read-file-content), 'conversion_required' (boolean), 'conversion_type' (string such as pdf-to-png when conversion_required is true, otherwise null), 'extraction_method' (non-empty string), and 'processing_notes' (string); (2) a 'total_documents' integer equal to the count of entries in processing_plan; (3) an 'output_file' string path to the saved ProcessingPlan_*.json file. For documents where content_type is 'image' or text_quality is 'none', conversion_required must be true. All processing_tool_id values must reference a tool defined in the registry.",
+                    "retry_on_failure": true,
+                    "max_retries": 3
+                  }
+                },
+                {
+                  "step_number": 3,
+                  "name": "Extract information from design brief documents",
+                  "description": "Using the processing plan output from Step 2, extract structured information from each identified design brief document. Apply the process step definitions from the 'Extract Information from Design Brief' process (proc-extract-design-brief-info) as the extraction guide. For each document, split the content into sections, score each section's relevance to the process step, tag sections with content categories (e.g. hv, lv, sl, earthing, easements, substation, funding), and produce a structured extraction grouped by category. The extraction must cover: (1) supply requirements â€” HV, LV, Street Lighting, Earthing, Easements, and Substation items; (2) determination of funding requirements â€” all items listed under this section including funding category, responsible party, and any stated amounts or formulas. Output one extraction JSON per document and a consolidated ExtractionReport.",
+                  "required_resources": {
+                    "agent_id": "agent-document-extractor",
+                    "tool_id": "tool-extract-document-data",
+                    "knowledge_id": "proc-extract-design-brief-info"
+                  },
+                  "validation": {
+                    "criteria": "Must return a JSON object with: (1) 'total_files' (integer) equal to the count of documents in the Step 2 processing plan; (2) 'extractions' (array) â€” one entry per file, each with: 'filename' matching a document from the processing plan, 'total_sections' (integer), 'relevant_sections' (integer, count of sections with relevance_score >= 0.4), 'extracted_sections' (array) where each section has 'section_name' (string), 'page_number' (integer), 'content_tags' (array of strings), 'relevance_score' (float 0.0-1.0), and 'relevance_reason' (string), and 'step_extraction' (object) with at least one of the following category keys containing a non-empty array: 'hv', 'lv', 'sl', 'earthing', 'easements', 'substation', 'funding_items' â€” each item must have 'description' (string) and 'source_section' (string); (3) 'output_file' (string) path to the saved ExtractionReport_*.json file.",
+                    "retry_on_failure": true,
+                    "max_retries": 3
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "templates": [
+    {
+      "template_id": "tmpl-jr-review-identify-design-brief-docs",
+      "worker_id": "dw-junior-engineer",
+      "name": "Review and Identify Design Brief Documents",
+      "description": "Upload the design brief package and identify all submitted documents. Extract key metadata, classify each document by type, and flag any missing or incomplete items against standard brief requirements.",
+      "triggers": [
+        "review design brief",
+        "design brief check",
+        "identify brief documents",
+        "brief review",
+        "design brief audit"
+      ],
+      "estimated_duration": "6m",
+      "steps": [
+        {
+          "step_number": 1,
+          "name": "Extract and analyse design brief documents",
+          "description": "Upload the design brief package (PDF, DOCX, or ZIP of documents) to the Content Reviewer Agent. Extract key metadata from each document including document title, document type (e.g. Architectural Brief, Structural Brief, Services Brief, Town Planning Report), author, date, project name, and project number. Produce a structured list of all identified documents.",
+          "required_resources": {
+            "agent_id": "agent-document-reviewer",
+            "tool_id": "tool-list-folder-files",
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Must return a JSON object with a 'documents' key containing a list of items, each with 'document_title', 'document_type', 'author', 'date', and 'project_name'.",
+            "retry_on_failure": true,
+            "max_retries": 3
+          }
+        },
+        {
+          "step_number": 2,
+          "name": "Plan document processing approach",
+          "description": "Read the Step 1 document review output file and the tool registry. For each identified document, determine which tool to use to extract or process it based on document type, content resolution quality (text vs image-based), and available tools. Determine whether format conversion is required (e.g. convert a scanned PDF to PNG for OCR). Produce a structured processing plan for each document.",
+          "required_resources": {
+            "agent_id": "agent-document-reviewer",
+            "tool_id": "tool-plan-document-processing",
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Must return a JSON object with: (1) a 'processing_plan' key â€” a list where each entry has: 'filename' (matching a document from the Step 1 DocumentReview output file), 'document_type' (string), 'content_type' (one of: text, image, unsupported, error), 'text_quality' (one of: high, low, none), 'recommended_reader' (string), 'processing_tool_id' (a valid tool ID from the registry, e.g. tool-extract-pdf-content or tool-read-file-content), 'conversion_required' (boolean), 'conversion_type' (string such as pdf-to-png when conversion_required is true, otherwise null), 'extraction_method' (non-empty string), and 'processing_notes' (string); (2) a 'total_documents' integer equal to the count of entries in processing_plan; (3) an 'output_file' string path to the saved ProcessingPlan_*.json file. For documents where content_type is 'image' or text_quality is 'none', conversion_required must be true. All processing_tool_id values must reference a tool defined in the registry.",
+            "retry_on_failure": true,
+            "max_retries": 3
+          }
+        },
+        {
+          "step_number": 3,
+          "name": "Extract information from design brief documents",
+          "description": "Using the processing plan output from Step 2, extract structured information from each identified design brief document. Apply the process step definitions from the 'Extract Information from Design Brief' process (proc-extract-design-brief-info) as the extraction guide. For each document, split the content into sections, score each section's relevance to the process step, tag sections with content categories (e.g. hv, lv, sl, earthing, easements, substation, funding), and produce a structured extraction grouped by category. The extraction must cover: (1) supply requirements â€” HV, LV, Street Lighting, Earthing, Easements, and Substation items; (2) determination of funding requirements â€” all items listed under this section including funding category, responsible party, and any stated amounts or formulas. Output one extraction JSON per document and a consolidated ExtractionReport.",
+          "required_resources": {
+            "agent_id": "agent-document-extractor",
+            "tool_id": "tool-extract-document-data",
+            "knowledge_id": "proc-extract-design-brief-info"
+          },
+          "validation": {
+            "criteria": "Must return a JSON object with: (1) 'total_files' (integer) equal to the count of documents in the Step 2 processing plan; (2) 'extractions' (array) â€” one entry per file, each with: 'filename' matching a document from the processing plan, 'total_sections' (integer), 'relevant_sections' (integer, count of sections with relevance_score >= 0.4), 'extracted_sections' (array) where each section has 'section_name' (string), 'page_number' (integer), 'content_tags' (array of strings), 'relevance_score' (float 0.0-1.0), and 'relevance_reason' (string), and 'step_extraction' (object) with at least one of the following category keys containing a non-empty array: 'hv', 'lv', 'sl', 'earthing', 'easements', 'substation', 'funding_items' â€” each item must have 'description' (string) and 'source_section' (string); (3) 'output_file' (string) path to the saved ExtractionReport_*.json file.",
+            "retry_on_failure": true,
+            "max_retries": 3
+          }
+        }
+      ]
+    },
+    {
+      "template_id": "tmpl-jr-extract-site-plan-info",
+      "worker_id": "dw-junior-engineer",
+      "name": "Extract Information from Site Plans",
+      "description": "Identify site plan documents in a project folder and extract structured substation data including asset number, transformer size, HV/LV switchgear, voltage level, cubicle size, and earthing information.",
+      "estimated_duration": "8m",
+      "triggers": [
+        "extract site plan",
+        "site plan review",
+        "substation notes",
+        "siteplan extraction",
+        "extract substation data"
+      ],
+      "steps": [
+        {
+          "step_number": 1,
+          "name": "Identify and Review Site Plan Documents",
+          "description": "Scan the project document folder for site plan drawings and electrical network diagrams. Identify all relevant files, classify each by type (site plan, substation drawing, network diagram), and produce a structured document list with metadata.",
+          "required_resources": {
+            "agent_id": "agent-document-reviewer",
+            "tool_id": "tool-list-folder-files",
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Must return a JSON object with a 'documents' key containing a list of matched site plan or drawing files, each with 'document_title', 'document_type', 'confidence', and 'filename'.",
+            "retry_on_failure": true,
+            "max_retries": 3
+          }
+        },
+        {
+          "step_number": 2,
+          "name": "Plan document processing approach",
+          "description": "Read the Step 1 document review output file and the tool registry. For each identified site plan document, determine the appropriate processing tool based on content type and text quality. Flag image-based drawings for OCR conversion.",
+          "required_resources": {
+            "agent_id": "agent-document-reviewer",
+            "tool_id": "tool-plan-document-processing",
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Must return a JSON object with a 'processing_plan' key â€” a list where each entry has 'filename', 'processing_tool_id', 'conversion_required', 'content_type', 'text_quality', and 'extraction_method'.",
+            "retry_on_failure": true,
+            "max_retries": 3
+          }
+        },
+        {
+          "step_number": 3,
+          "name": "Extract information from design brief documents",
+          "description": "Using the processing plan from Step 2, extract structured site plan data from each identified document. Apply the process step definitions from the 'Extract Information from Site Plans' process (proc-extract-site-plan-info) as the extraction guide. For each document extract: substation asset number, transformer size, HV switchgear (applying the 1.5MVA â†’ Siemens RLR rule), voltage level, LV switchgear, cubicle size, and earthing information from substation notes and drawing annotations.",
+          "required_resources": {
+            "agent_id": "agent-document-extractor",
+            "tool_id": "tool-extract-document-data",
+            "knowledge_id": "proc-extract-site-plan-info"
+          },
+          "validation": {
+            "criteria": "Must return a JSON object with 'total_files' and 'extractions' array. Each extraction must include 'filename' and 'sub_step_extractions' with keys for substation, transformer, hv-switchgear, voltage, lv-switchgear, cubicle, and earthing data. Output file path must be present.",
+            "retry_on_failure": true,
+            "max_retries": 3
+          }
+        }
+      ]
+    },
+    {
+      "template_id": "tmpl-jr-review-customer-connections",
+      "worker_id": "dw-junior-engineer",
+      "name": "Review Customer Connections Application",
+      "description": "Full review of a Customer Connections Application â€” identifies all relevant documents, extracts design brief and site plan information in parallel, then consolidates results into a unified report.",
+      "triggers": [
+        "review customer connections",
+        "customer connections application",
+        "connections application review",
+        "customer connections review",
+        "cca review"
+      ],
+      "estimated_duration": "12m",
+      "steps": [
+        {
+          "step_number": 1,
+          "name": "Identify and Review All Application Documents",
+          "description": "Scan the project document folder for all relevant documents. Use the search context and document categorisation rules from the process knowledge files (proc-extract-design-brief-info, proc-extract-site-plan-info, and proc-extract-asset-spreadsheet) to determine which files to include and how to classify each document type. For each file found, read the document content and classify it as one of: 'Design Brief', 'Architectural Brief', 'Services Brief', 'Town Planning Report', 'Reticulation Drawing', 'Site Plan Drawing', 'Substation Diagram', 'Network Diagram', or 'TAL'. Any Excel spreadsheet file (.xlsx or .xls) containing asset register, equipment schedule, or inventory data (columns for Asset ID, Asset Type, Location, Condition Rating, or similar) must be classified as 'TAL' (Technical Asset List). Classification must be based on document content â€” what the document actually contains â€” not its filename. Produce a structured document list with metadata for all matched files.",
+          "required_resources": {
+            "agent_id": "agent-document-reviewer",
+            "tool_id": "tool-list-folder-files",
+            "knowledge_id": "proc-extract-design-brief-info,proc-extract-site-plan-info,proc-extract-asset-spreadsheet"
+          },
+          "validation": {
+            "criteria": "Must return a JSON object with a 'documents' key containing a list of all matched files, each with 'document_title', 'document_type', 'confidence', and 'filename'. The 'document_type' field must reflect what the document actually contains based on a content review, not the filename. Spreadsheet files (.xlsx, .xls) containing asset register or equipment schedule data must have document_type set to TAL.",
+            "retry_on_failure": true,
+            "max_retries": 3
+          }
+        },
+        {
+          "step_number": 2,
+          "name": "Plan document processing approach",
+          "description": "CRITICAL OUTPUT REQUIREMENT: Every entry in the 'processing_plan' array MUST include a 'document_category' field set to exactly 'Design Brief', 'Site Plan', or 'TAL'. This field is mandatory â€” omitting it will cause step failure. Read the Step 1 document review output file and the tool registry. For each identified document produce a processing plan entry with ALL of the following fields: 'filename', 'document_type', 'content_type', 'text_quality', 'recommended_reader', 'processing_tool_id', 'conversion_required', 'conversion_type', 'extraction_method', 'processing_notes', 'document_category', 'page_size', 'requires_chunking', 'chunk_strategy', and 'estimated_chunks'. For spreadsheet files (.xlsx, .xls, .xlsm, .xlsb) with document_category 'TAL', the processing plan entry will also contain 'worksheet_count' (total sheets in the file), 'worksheets_to_analyse' (non-empty sheets), and 'worksheets' (array of {sheet_name, row_count, column_count}) — these are pre-populated by the agent and must be preserved exactly as provided in the output. To assign 'document_category', apply these rules IN ORDER: RULE 0 - TAL SPREADSHEET: if the file extension is .xlsx, .xls, .xlsm, or .xlsb, set document_category to 'TAL' regardless of any other rules. RULE 1 â€” SITE PLAN FILENAME: if the filename contains any of 'RETIC', 'retic', 'DWG', 'dwg', 'SITEPLAN', 'DRAWING', 'SUBSTATION', set document_category to 'Site Plan'. RULE 2 â€” DESIGN BRIEF FILENAME: if the filename contains any of 'BRIEF', 'brief', 'ARP', 'DESIGN_BRIEF', 'ARCHITECTURAL', 'SERVICES', 'TOWN_PLANNING', set document_category to 'Design Brief'. RULE 3 â€” CONTENT FALLBACK (only when filename has no clear signal): use document_type from Step 1 â€” 'Reticulation Drawing', 'Site Plan Drawing', 'Substation Diagram', or 'Network Diagram' maps to 'Site Plan'; 'Design Brief', 'Architectural Brief', 'Services Brief', or 'Town Planning Report' maps to 'Design Brief'; 'TAL' maps to 'TAL'. PAGE SIZE AND CHUNKING ASSESSMENT: Open each document and inspect the actual page dimensions. Classify page_size as one of: 'A4' (210Ã—297mm), 'A3' (297Ã—420mm), 'A2' (420Ã—594mm), 'A1' (594Ã—841mm), 'A0' (841Ã—1189mm), or 'large-format' (anything larger). Set requires_chunking to true if page_size is 'A2', 'A1', 'A0', or 'large-format' â€” these pages are too large for a single LLM context pass and must be split. For requires_chunking true, set chunk_strategy to 'quadrant-split' for A2/A1/A0/large-format drawings (split page into overlapping quadrants), or 'page-split' for multi-page text documents where individual pages exceed A3. Set estimated_chunks to the expected number of chunks per page (A2â†’4, A1â†’6, A0â†’9, large-formatâ†’12; use 1 for A4/A3). Set chunk_strategy to 'none' and estimated_chunks to 1 when requires_chunking is false. Example output entry: {\"filename\": \"DS1_DAR1988_RETIC.pdf\", \"document_type\": \"Reticulation Drawing\", \"content_type\": \"image\", \"text_quality\": \"none\", \"recommended_reader\": \"ocr\", \"processing_tool_id\": \"tool-extract-pdf-content\", \"conversion_required\": true, \"conversion_type\": \"pdf-to-png\", \"extraction_method\": \"ocr\", \"processing_notes\": \"A1 large-format drawing, requires OCR with quadrant chunking\", \"document_category\": \"Site Plan\", \"page_size\": \"A1\", \"requires_chunking\": true, \"chunk_strategy\": \"quadrant-split\", \"estimated_chunks\": 6} ROUTING RULES (set route_to_step in every processing plan entry): TAL files (.xlsx, .xls, .xlsm, .xlsb) set route_to_step=6, requires_chunking=false, chunk_strategy=\"none\" — they bypass Steps 3, 4, and 5 and go directly to Step 6 (asset spreadsheet extraction). Design Brief files set route_to_step=4. Site Plan files set route_to_step=5. Add \"route_to_step\" as a mandatory field in every processing plan entry.",
+          "required_resources": {
+            "agent_id": "agent-document-reviewer",
+            "tool_id": "tool-plan-document-processing",
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Must return a JSON object with a 'processing_plan' key (array) and 'total_documents' integer. MANDATORY: every entry in 'processing_plan' must contain ALL of these fields: 'filename', 'processing_tool_id', 'conversion_required', 'content_type', 'text_quality', 'extraction_method', 'document_category', 'page_size', 'requires_chunking', 'chunk_strategy', and 'estimated_chunks'. The 'document_category' field must be exactly 'Design Brief', 'Site Plan', or 'TAL'. Files with RETIC/DWG/SITEPLAN/DRAWING/SUBSTATION in their filename must have document_category 'Site Plan'. Files with BRIEF/ARP/DESIGN_BRIEF/ARCHITECTURAL/SERVICES/TOWN_PLANNING in their filename must have document_category 'Design Brief'. The 'page_size' field must be one of: 'A4', 'A3', 'A2', 'A1', 'A0', or 'large-format'. The 'requires_chunking' field must be true for any entry where page_size is 'A2', 'A1', 'A0', or 'large-format'. When requires_chunking is true, 'chunk_strategy' must be 'quadrant-split' or 'page-split' (not 'none') and 'estimated_chunks' must be greater than 1. Files with extension .xlsx, .xls, .xlsm, or .xlsb must have document_category 'TAL'. TAL entries must also include 'worksheet_count' (integer), 'worksheets_to_analyse' (integer), and 'worksheets' (array). A missing or null 'document_category' is a critical failure. Every entry must also include 'route_to_step' (integer: 4 for Design Brief, 5 for Site Plan, 6 for TAL). TAL entries must have requires_chunking=false and chunk_strategy=\"none\".",
+            "retry_on_failure": true,
+            "max_retries": 3
+          }
+        },
+        {
+          "step_number": 3,
+          "name": "Chunk Documents for Processing",
+          "description": "Read the Step 2 processing plan and identify all documents where requires_chunking is true AND route_to_step is NOT 6. TAL spreadsheet files (route_to_step=6) do not require chunking and must be excluded from this step — they are processed directly in Step 6. For each such document, call the document chunker with the document's chunk_strategy and page_size to render it into a sequence of PNG image chunks. A quadrant-split A1 drawing produces 6 PNG chunks (3 cols Ã— 2 rows); an A0 drawing produces 9 chunks (3Ã—3); a large-format drawing produces 12 chunks (4Ã—3). Each chunk is a distinct region of the page at 200 DPI. Output a chunk manifest per document listing all generated chunk files in sequence order with their region labels, dimensions, and file paths. Documents where requires_chunking is false are passed through unchanged and listed in documents_not_chunked.",
+          "required_resources": {
+            "agent_id": "agent-document-chunker",
+            "tool_id": "tool-chunk-documents",
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Must return a JSON object with 'total_documents_chunked' (integer â‰¥ 0), 'documents_not_chunked' (list of filenames), and 'chunked_documents' (object keyed by filename). Each entry in 'chunked_documents' must include 'job_id', 'chunk_strategy', 'page_size', 'total_chunks', 'total_pages', and a 'chunks' array. Each chunk entry must have 'chunk_id', 'sequence', 'page_number', 'region', 'filename', 'filepath', 'width_px', and 'height_px'. Documents with requires_chunking=false must not appear in 'chunked_documents'.",
+            "retry_on_failure": true,
+            "max_retries": 2
+          }
+        },
+        {
+          "step_number": 4,
+          "name": "Extract Design Brief Information",
+          "description": "NOTE: Only process documents with route_to_step=4 (document_category=\"Design Brief\"). TAL spreadsheet files and Site Plan files must be excluded. Using the processing plan from Step 2, filter the document list to only those documents that meet the search context of the 'Extract Information from Design Brief' process (proc-extract-design-brief-info). A document qualifies if its content matches the search context criteria: it must contain a 'Method of Supply Requirement' section and/or a 'Determination of Funding Requirements' section, or be an architectural, services, or town planning report. Do not process any document that does not meet this content criteria, even if it was tagged as 'Design Brief' in Step 2 â€” and do not process any Site Plan or drawing document. For each qualifying document, extract structured information using proc-extract-design-brief-info as the extraction guide. Extract supply requirements (HV, LV, Street Lighting, Earthing, Easements, Substation) and funding determination items.",
+          "required_resources": {
+            "agent_id": "agent-document-extractor",
+            "tool_id": "tool-extract-document-data",
+            "knowledge_id": "proc-extract-design-brief-info"
+          },
+          "parallel_group": "",
+          "validation": {
+            "criteria": "Must return a JSON object with 'total_files' and 'extractions' array containing only documents whose content matches the proc-extract-design-brief-info search context (i.e. documents containing a Method of Supply or Determination of Funding Requirements section). Must not include Site Plan, drawing, or reticulation documents. Each extraction must include 'filename', 'total_sections', 'relevant_sections', 'page_size', 'requires_chunking', 'chunk_strategy', 'estimated_chunks', and 'step_extraction' with at least one of: hv, lv, sl, earthing, easements, substation, funding_items. The 'page_size' field must be one of: 'A4', 'A3', 'A2', 'A1', 'A0', or 'large-format'. When 'requires_chunking' is true, 'chunk_strategy' must be 'quadrant-split' or 'page-split' and 'estimated_chunks' must be greater than 1.",
+            "retry_on_failure": true,
+            "max_retries": 3
+          }
+        },
+        {
+          "step_number": 5,
+          "name": "Extract Site Plan Information",
+          "description": "NOTE: Only process documents with route_to_step=5 (document_category=\"Site Plan\"). TAL spreadsheet files and Design Brief files must be excluded. Using the processing plan from Step 2, filter the document list to only those where 'document_category' is 'Site Plan'. Do not process any document tagged as 'Design Brief'. For each Site Plan document, extract structured site plan data using the 'Extract Information from Site Plans' process (proc-extract-site-plan-info) as the extraction guide. Extract substation asset number, transformer size, HV/LV switchgear (applying the 1.5MVA Siemens RLR rule), voltage level, cubicle size, and earthing information.",
+          "required_resources": {
+            "agent_id": "agent-document-extractor",
+            "tool_id": "tool-extract-document-data",
+            "knowledge_id": "proc-extract-site-plan-info"
+          },
+          "parallel_group": "",
+          "validation": {
+            "criteria": "Must return a JSON object with 'total_files' and 'extractions' array containing only documents where 'document_category' is 'Site Plan'. Must not include any Design Brief documents. Each extraction must include 'filename', 'page_size', 'requires_chunking', 'chunk_strategy', 'estimated_chunks', and 'sub_step_extractions' with keys for substation, transformer, hv-switchgear, voltage, lv-switchgear, cubicle, and earthing data. The 'page_size' field must be one of: 'A4', 'A3', 'A2', 'A1', 'A0', or 'large-format'. Site Plan drawings are typically A1 or A0 â€” a 'page_size' of 'A4' for a drawing document should be flagged. When 'requires_chunking' is true, 'chunk_strategy' must be 'quadrant-split' or 'page-split' and 'estimated_chunks' must be greater than 1.",
+            "retry_on_failure": true,
+            "max_retries": 3
+          }
+        },
+        {
+          "step_number": 6,
+          "name": "Extract Asset Spreadsheet Data",
+          "description": "NOTE: Only process documents with route_to_step=6 (document_category=\"TAL\"). TAL files do not require chunking — run this step directly after Step 2 without needing Steps 3, 4, or 5. Using the processing plan from Step 2, filter the document list to only those entries with document_category of exactly \"TAL\" (Technical Asset List). These are the spreadsheet files (.xlsx, .xls, .xlsm, .xlsb) identified in Step 1. For each TAL document, use the proc-extract-asset-spreadsheet process as the extraction guide. Each spreadsheet entry from Step 2 includes worksheet_count (total sheets), worksheets_to_analyse (non-empty sheets), and a worksheets array listing each sheet name with its row_count and column_count — use these to plan how many extraction passes are needed. For each non-empty worksheet: identify the header row, map column names to standard asset fields (Asset ID, Serial Number, Asset Type, Description, Location, Address, Feeder, Voltage Level, Capacity Rating, Manufacturer, Model, Condition Rating, Status, Installation Date, Last Inspection Date), and extract every data row as a structured asset record. Include source_sheet and source_document in every record. Produce a consolidated output with all asset_records across all sheets and all TAL files. OUTPUT FILE: The agent saves a dedicated AssetExtract_{timestamp}.json file to the job output directory. This file contains: process_id, timestamp, source_documents (list of spreadsheet filenames), total_assets (integer), and asset_records (flat array of all extracted asset records across all sheets and all TAL files). This file is stored in state as asset_extraction and is available for use by Step 7 (report consolidation) and any subsequent steps.",
+          "required_resources": {
+            "agent_id": "agent-document-extractor",
+            "tool_id": "tool-extract-document-data",
+            "knowledge_id": "proc-extract-asset-spreadsheet"
+          },
+          "parallel_group": "",
+          "validation": {
+            "criteria": "Must return a JSON object with \"total_files\" integer and \"extractions\" array. Each extraction entry must include \"filename\", \"total_sections\", \"relevant_sections\", and \"step_extraction\" containing \"asset_records\" (array), \"total_assets\" (integer), and \"source_documents\" (array). Every asset_record must have at minimum: asset_id or serial_number (at least one non-null), asset_type, and source_sheet. Only documents with document_category \"TAL\" must be processed — no PDF or Design Brief files. The response must also include asset_extract_file (path to AssetExtract_*.json) and asset_extract.total_assets (integer count of all extracted asset records).",
+            "retry_on_failure": true,
+            "max_retries": 3
+          }
+        },
+        {
+          "step_number": 7,
+          "name": "Consolidate Application Review Report",
+          "description": "Merge the design brief extraction and site plan extraction results from Steps 4 and 5 into a single unified Customer Connections Application Review report. Summarize all extracted supply requirements, funding items, and site plan data in a consolidated JSON report.",
+          "required_resources": {
+            "agent_id": "agent-report-consolidator",
+            "tool_id": "tool-consolidate-report",
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Must return a JSON object with 'report_type', 'generated_at', 'source_extractions' containing design brief and site plan results, and a 'summary' section.",
+            "retry_on_failure": false,
+            "max_retries": 1
+          }
+        }
+      ]
+    }
+  ]
+}

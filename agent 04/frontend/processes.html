@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Process Library — Agent Workflow</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%22 height=%2232%22 rx=%226%22 fill=%22%23161616%22/%3E%3Crect x=%228%22 y=%2210%22 width=%2216%22 height=%2212%22 rx=%223%22 fill=%22none%22 stroke=%22%234d9fff%22 stroke-width=%222%22/%3E%3Ccircle cx=%2212%22 cy=%2216%22 r=%221.5%22 fill=%22%234d9fff%22/%3E%3Ccircle cx=%2220%22 cy=%2216%22 r=%221.5%22 fill=%22%234d9fff%22/%3E%3Crect x=%2214%22 y=%227%22 width=%224%22 height=%223%22 rx=%221%22 fill=%22%234d9fff%22/%3E%3C/svg%3E">
+    <script>(function(){
+        try {
+            var a = JSON.parse(sessionStorage.getItem('agent_auth')||'null');
+            if (!a || !a.exp || Date.now()/1000 >= a.exp) {
+                sessionStorage.removeItem('agent_auth');
+                window.location.replace('/login.html');
+            }
+        } catch(e) { window.location.replace('/login.html'); }
+    })();</script>
+    <script>(function(){if(localStorage.getItem('theme')==='light')document.documentElement.classList.add('light');})()</script>
+    <style>
+        :root {
+            --bg: #161616;
+            --panel-bg: #1e1e1e;
+            --card-bg: #252525;
+            --header-bg: #141414;
+            --header-h: 52px;
+            --panel-border: rgba(255,255,255,0.08);
+            --node-border: rgba(255,255,255,0.1);
+            --text: #d4d4d4;
+            --text-dim: #888;
+            --text-muted: #555;
+            --blue: #4d9fff;
+            --blue-dark: #2563eb;
+            --green: #22c55e;
+            --amber: #f59e0b;
+            --red: #ef4444;
+            --purple: #a78bfa;
+            --teal: #2dd4bf;
+            --sidebar-w: 300px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* ── HEADER ── */
+        .app-header { height: var(--header-h); background: var(--header-bg); border-bottom: 1px solid var(--panel-border); display: flex; align-items: center; padding: 0 16px; gap: 12px; flex-shrink: 0; }
+        .header-brand { font-size: 0.88rem; font-weight: 700; white-space: nowrap; padding-right: 12px; border-right: 1px solid var(--panel-border); }
+        .header-brand span { color: var(--blue); }
+        .header-title { font-size: 0.82rem; font-weight: 600; color: var(--text-dim); }
+        .header-sep { width: 1px; height: 24px; background: var(--panel-border); flex-shrink: 0; }
+        .hbtn { padding: 7px 14px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem; transition: background .15s; white-space: nowrap; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+        .hbtn-ghost { background: rgba(255,255,255,0.05); color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1); }
+        .hbtn-ghost:hover { background: rgba(255,255,255,0.09); color: var(--text); }
+
+        /* ── BODY ── */
+        .app-body { flex: 1; display: flex; overflow: hidden; }
+
+        /* ── SIDEBAR ── */
+        .sidebar { width: var(--sidebar-w); background: var(--panel-bg); border-right: 1px solid var(--panel-border); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; }
+        .sidebar-head { padding: 14px 14px 10px; border-bottom: 1px solid var(--panel-border); flex-shrink: 0; }
+        .sidebar-head h2 { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin-bottom: 8px; }
+        .search-box { width: 100%; background: #2a2a2a; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: var(--text); padding: 6px 10px; font-size: 0.78rem; outline: none; transition: border-color .15s; }
+        .search-box:focus { border-color: rgba(77,159,255,0.4); }
+        .search-box::placeholder { color: var(--text-muted); }
+        .proc-list { flex: 1; overflow-y: auto; padding: 8px; }
+        .proc-item { padding: 9px 11px; border-radius: 6px; cursor: pointer; margin-bottom: 4px; border: 1px solid transparent; transition: background .15s, border-color .15s; }
+        .proc-item:hover { background: rgba(255,255,255,0.04); }
+        .proc-item.active { background: rgba(77,159,255,0.1); border-color: rgba(77,159,255,0.25); }
+        .proc-item-name { font-size: 0.78rem; font-weight: 600; color: var(--text); margin-bottom: 3px; line-height: 1.3; }
+        .proc-item.active .proc-item-name { color: var(--blue); }
+        .proc-item-meta { display: flex; gap: 6px; align-items: center; }
+        .proc-item-steps { font-size: 0.62rem; color: var(--text-muted); }
+        .proc-item-ver { font-size: 0.58rem; padding: 1px 5px; border-radius: 9999px; background: rgba(255,255,255,0.05); color: var(--text-muted); }
+        .sidebar-empty { padding: 20px 14px; font-size: 0.78rem; color: var(--text-muted); text-align: center; }
+
+        /* ── WORKER HIERARCHY ── */
+        .worker-group { margin-bottom: 2px; }
+        .worker-group-hdr { display: flex; align-items: center; gap: 8px; padding: 8px 10px 7px; cursor: pointer; user-select: none; border-radius: 6px; transition: background .15s; }
+        .worker-group-hdr:hover { background: rgba(255,255,255,0.04); }
+        .worker-icon { width: 30px; height: 30px; border-radius: 8px; background: rgba(77,159,255,0.12); border: 1px solid rgba(77,159,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+        .worker-label { flex: 1; min-width: 0; }
+        .worker-role { font-size: 0.55rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
+        .worker-name { font-size: 0.8rem; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .worker-chev { font-size: 0.55rem; color: var(--text-muted); transition: transform .2s; flex-shrink: 0; }
+        .worker-chev.open { transform: rotate(180deg); }
+        .worker-body { padding: 2px 0 4px 14px; margin-left: 14px; border-left: 1px solid rgba(255,255,255,0.07); }
+        .worker-body.collapsed { display: none; }
+        .worker-proc-count { font-size: 0.6rem; padding: 2px 6px; border-radius: 9999px; background: rgba(77,159,255,0.1); color: var(--blue); border: 1px solid rgba(77,159,255,0.15); white-space: nowrap; flex-shrink: 0; }
+        .worker-empty { font-size: 0.7rem; color: var(--text-muted); padding: 6px 8px; font-style: italic; }
+        .ungrouped-title { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); padding: 10px 10px 4px; }
+
+        /* ── MAIN CONTENT ── */
+        .main { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+        /* Empty / loading states */
+        .state-msg { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); gap: 10px; }
+        .state-msg-icon { font-size: 2.5rem; opacity: 0.25; }
+        .state-msg-text { font-size: 0.85rem; opacity: 0.5; }
+
+        /* ── PROCESS HEADER ── */
+        .proc-header { margin-bottom: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--panel-border); }
+        .proc-breadcrumb { font-size: 0.68rem; color: var(--text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+        .proc-id-chip { font-family: 'Courier New', monospace; font-size: 0.65rem; padding: 2px 7px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.08); }
+        .proc-title { font-size: 1.4rem; font-weight: 700; color: #f0f0f0; margin-bottom: 8px; line-height: 1.3; }
+        .proc-meta-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+        .proc-badge { font-size: 0.63rem; font-weight: 700; padding: 3px 9px; border-radius: 9999px; white-space: nowrap; }
+        .proc-badge.version { background: rgba(77,159,255,0.12); color: var(--blue); border: 1px solid rgba(77,159,255,0.2); }
+        .proc-badge.steps   { background: rgba(139,92,246,0.12); color: var(--purple); border: 1px solid rgba(139,92,246,0.2); }
+        .proc-summary { font-size: 0.83rem; color: var(--text-dim); line-height: 1.65; max-width: 820px; }
+
+        /* ── IO CARDS ── */
+        .io-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 28px; }
+        .io-card { background: var(--card-bg); border: 1px solid var(--node-border); border-radius: 8px; padding: 14px 16px; }
+        .io-card.input  { border-left: 3px solid var(--blue); }
+        .io-card.output { border-left: 3px solid var(--green); }
+        .io-card-title { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+        .io-card-title .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .io-card.input  .dot { background: var(--blue); }
+        .io-card.output .dot { background: var(--green); }
+        .io-desc { font-size: 0.78rem; color: var(--text-dim); line-height: 1.5; margin-bottom: 10px; }
+        .io-fields { display: flex; flex-direction: column; gap: 4px; }
+        .io-field { display: flex; align-items: baseline; gap: 7px; font-size: 0.72rem; }
+        .io-field-key { font-family: 'Courier New', monospace; font-size: 0.68rem; color: #93c5fd; flex-shrink: 0; }
+        .io-field-val { color: var(--text-muted); line-height: 1.4; }
+
+        /* ── STEPS ── */
+        .steps-title { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--panel-border); }
+        .step-card { background: var(--card-bg); border: 1px solid var(--node-border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+        .step-hdr { display: flex; align-items: center; gap: 12px; padding: 13px 16px; cursor: pointer; transition: background .15s; user-select: none; }
+        .step-hdr:hover { background: rgba(255,255,255,0.03); }
+        .step-num { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; color: white; flex-shrink: 0; }
+        .step-num.c0 { background: var(--blue-dark); }
+        .step-num.c1 { background: #7c3aed; }
+        .step-num.c2 { background: #0f766e; }
+        .step-num.c3 { background: #b45309; }
+        .step-num.c4 { background: #be123c; }
+        .step-info { flex: 1; min-width: 0; }
+        .step-name { font-size: 0.85rem; font-weight: 600; color: #f0f0f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .step-summary-short { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .step-chips { display: flex; gap: 5px; flex-shrink: 0; }
+        .step-chip { font-size: 0.6rem; font-weight: 700; padding: 2px 7px; border-radius: 9999px; white-space: nowrap; }
+        .step-chip.agent  { background: rgba(77,159,255,0.1); color: var(--blue); border: 1px solid rgba(77,159,255,0.2); }
+        .step-chip.tool   { background: rgba(45,212,191,0.1); color: var(--teal); border: 1px solid rgba(45,212,191,0.2); }
+        .step-chev { font-size: 0.62rem; color: var(--text-muted); transition: transform .2s; flex-shrink: 0; }
+        .step-chev.open { transform: rotate(180deg); }
+
+        /* Step body */
+        .step-body { display: none; border-top: 1px solid rgba(255,255,255,0.05); }
+        .step-body.open { display: block; }
+        .step-body-inner { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+        /* Details block */
+        .step-section-title { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin-bottom: 5px; }
+        .step-details-text { font-size: 0.78rem; color: var(--text-dim); line-height: 1.65; }
+
+        /* IO panels inside step */
+        .step-io-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .step-io-panel { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; padding: 10px 12px; }
+        .step-io-panel.expected-in  { border-left: 2px solid rgba(77,159,255,0.5); }
+        .step-io-panel.expected-out { border-left: 2px solid rgba(34,197,94,0.5); }
+        .step-io-panel.actual-in    { border-left: 2px solid rgba(77,159,255,0.25); }
+        .step-io-panel.actual-out   { border-left: 2px solid rgba(34,197,94,0.25); }
+        .siop-title { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 7px; }
+        .step-io-panel.expected-in  .siop-title { color: rgba(77,159,255,0.8); }
+        .step-io-panel.expected-out .siop-title { color: rgba(34,197,94,0.8); }
+        .step-io-panel.actual-in    .siop-title { color: rgba(77,159,255,0.55); }
+        .step-io-panel.actual-out   .siop-title { color: rgba(34,197,94,0.55); }
+        .siop-desc { font-size: 0.72rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 7px; }
+        .siop-field { display: flex; gap: 6px; margin-bottom: 4px; font-size: 0.7rem; align-items: baseline; }
+        .siop-key { font-family: 'Courier New', monospace; font-size: 0.66rem; color: #93c5fd; flex-shrink: 0; min-width: 100px; }
+        .siop-val { color: var(--text-muted); line-height: 1.4; word-break: break-word; }
+        .siop-val code { font-family: 'Courier New', monospace; font-size: 0.9em; background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px; color: #86efac; }
+
+        /* Resource strip */
+        .step-resource-strip { display: flex; gap: 8px; flex-wrap: wrap; padding: 8px 12px; background: rgba(0,0,0,0.2); border-top: 1px solid rgba(255,255,255,0.04); }
+        .res-pill { display: flex; align-items: center; gap: 4px; font-size: 0.62rem; font-weight: 600; padding: 3px 8px; border-radius: 9999px; }
+        .res-pill.agent    { background: rgba(77,159,255,0.08); color: rgba(77,159,255,0.9); border: 1px solid rgba(77,159,255,0.18); }
+        .res-pill.tool     { background: rgba(45,212,191,0.08); color: rgba(45,212,191,0.9); border: 1px solid rgba(45,212,191,0.18); }
+        .res-pill.endpoint { background: rgba(255,255,255,0.04); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.08); font-family: monospace; font-size: 0.58rem; }
+        .res-pill.stored   { background: rgba(139,92,246,0.08); color: rgba(139,92,246,0.9); border: 1px solid rgba(139,92,246,0.18); }
+
+        /* Sub-steps */
+        .substeps-section { margin-top: 2px; }
+        .substeps-title { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin-bottom: 8px; }
+        .substep-list { display: flex; flex-direction: column; gap: 8px; }
+        .substep-card { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.06); border-left: 3px solid rgba(139,92,246,0.45); border-radius: 6px; overflow: hidden; }
+        .substep-hdr { display: flex; align-items: center; gap: 10px; padding: 9px 12px 6px; }
+        .substep-num { width: 20px; height: 20px; border-radius: 50%; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); display: flex; align-items: center; justify-content: center; font-size: 0.58rem; font-weight: 700; color: rgba(139,92,246,0.9); flex-shrink: 0; }
+        .substep-id-chip { font-family: 'Courier New', monospace; font-size: 0.58rem; padding: 2px 6px; border-radius: 4px; background: rgba(139,92,246,0.1); color: rgba(139,92,246,0.85); border: 1px solid rgba(139,92,246,0.2); flex-shrink: 0; white-space: nowrap; }
+        .substep-name { font-size: 0.78rem; font-weight: 600; color: var(--text); flex: 1; min-width: 0; }
+        .substep-body { padding: 0 12px 10px 42px; display: flex; flex-direction: column; gap: 8px; }
+        .substep-details { font-size: 0.75rem; color: var(--text-dim); line-height: 1.65; white-space: pre-wrap; }
+        .instructional-steps { display: flex; flex-direction: column; gap: 6px; }
+        .inst-step { background: rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.05); border-radius: 5px; padding: 8px 10px; }
+        .inst-step-title { font-size: 0.7rem; font-weight: 700; color: rgba(139,92,246,0.75); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+        .inst-step-num { font-size: 0.58rem; background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.22); border-radius: 3px; padding: 1px 5px; color: rgba(139,92,246,0.8); font-family: 'Courier New', monospace; }
+        .inst-step-text { font-size: 0.73rem; color: var(--text-dim); line-height: 1.65; }
+
+        /* ── SEARCH CONTEXT ── */
+        .search-ctx-card { background: var(--card-bg); border: 1px solid var(--node-border); border-left: 3px solid var(--teal); border-radius: 8px; padding: 14px 16px; margin-bottom: 24px; }
+        .search-ctx-title { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--teal); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+        .search-ctx-body { font-size: 0.78rem; color: var(--text-dim); line-height: 1.65; }
+        .search-ctx-body em { font-style: normal; color: var(--teal); font-weight: 600; }
+
+        /* Consolidated output */
+        .consol-card { background: var(--card-bg); border: 1px solid var(--node-border); border-top: 3px solid var(--amber); border-radius: 8px; padding: 16px; margin-top: 10px; }
+        .consol-title { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--amber); margin-bottom: 8px; }
+        .consol-desc { font-size: 0.78rem; color: var(--text-dim); line-height: 1.5; margin-bottom: 10px; }
+        .consol-schema { background: #0d1117; border-radius: 5px; padding: 10px 12px; font-family: 'Courier New', monospace; font-size: 0.68rem; color: #86efac; line-height: 1.6; border: 1px solid rgba(255,255,255,0.06); white-space: pre-wrap; word-break: break-all; max-height: 260px; overflow-y: auto; }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+        .theme-toggle-btn { background: transparent; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-dim); cursor: pointer; font-size: 0.9rem; padding: 5px 9px; line-height: 1; transition: background .15s; }
+        .theme-toggle-btn:hover { background: rgba(128,128,128,0.12); }
+
+        /* ── EXECUTE BUTTON & STATUS BADGES ── */
+        .step-exec-btn { padding: 5px 12px; border-radius: 6px; border: 1px solid rgba(77,159,255,0.3); background: rgba(77,159,255,0.08); color: var(--blue); font-size: 0.68rem; font-weight: 700; cursor: pointer; transition: background .15s, border-color .15s; white-space: nowrap; flex-shrink: 0; }
+        .step-exec-btn:hover:not(:disabled) { background: rgba(77,159,255,0.18); border-color: rgba(77,159,255,0.5); }
+        .step-exec-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .step-exec-btn.done { border-color: rgba(34,197,94,0.35); background: rgba(34,197,94,0.08); color: var(--green); }
+        .step-exec-btn.error { border-color: rgba(239,68,68,0.35); background: rgba(239,68,68,0.08); color: var(--red); }
+        .status-badge { font-size: 0.62rem; font-weight: 700; padding: 2px 8px; border-radius: 9999px; white-space: nowrap; flex-shrink: 0; display: none; }
+        .status-badge.pending  { display: inline-block; background: rgba(255,255,255,0.06); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.1); }
+        .status-badge.running  { display: inline-block; background: rgba(245,158,11,0.12); color: var(--amber); border: 1px solid rgba(245,158,11,0.25); }
+        .status-badge.done     { display: inline-block; background: rgba(34,197,94,0.1); color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+        .status-badge.error    { display: inline-block; background: rgba(239,68,68,0.1); color: var(--red); border: 1px solid rgba(239,68,68,0.25); }
+
+        /* ── STEP OUTPUT PANEL ── */
+        .step-output-panel { display: none; background: #0d1117; border: 1px solid rgba(255,255,255,0.08); border-top: 2px solid var(--green); border-radius: 0 0 6px 6px; }
+        .step-output-panel.open { display: block; }
+        .step-out-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .step-out-title { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--green); }
+        .step-out-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; }
+        .step-out-close:hover { background: rgba(255,255,255,0.06); }
+        .step-out-json { font-family: 'Courier New', monospace; font-size: 0.68rem; color: #86efac; line-height: 1.6; padding: 12px; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; }
+        .step-out-error { font-family: 'Courier New', monospace; font-size: 0.72rem; color: var(--red); padding: 12px; white-space: pre-wrap; }
+
+        /* ── EXEC MODAL ── */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 200; display: flex; align-items: center; justify-content: center; }
+        .modal-box { background: #1e1e1e; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; width: 420px; max-width: 95vw; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+        .modal-hdr { padding: 16px 18px 12px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .modal-hdr-title { font-size: 0.85rem; font-weight: 700; color: #f0f0f0; }
+        .modal-hdr-sub { font-size: 0.72rem; color: var(--text-muted); margin-top: 3px; }
+        .modal-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem; padding: 4px; line-height: 1; border-radius: 4px; }
+        .modal-close:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+        .modal-body { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+        .modal-field { display: flex; flex-direction: column; gap: 5px; }
+        .modal-label { font-size: 0.7rem; font-weight: 700; color: var(--text-dim); }
+        .modal-label span { font-family: 'Courier New', monospace; font-size: 0.66rem; color: #93c5fd; }
+        .modal-hint { font-size: 0.65rem; color: var(--text-muted); }
+        .modal-input { background: #2a2a2a; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: var(--text); padding: 8px 10px; font-size: 0.78rem; outline: none; transition: border-color .15s; width: 100%; }
+        .modal-input:focus { border-color: rgba(77,159,255,0.4); }
+        .modal-footer { padding: 12px 18px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; gap: 8px; justify-content: flex-end; }
+        .modal-btn { padding: 7px 16px; border-radius: 6px; font-weight: 700; font-size: 0.78rem; cursor: pointer; border: none; transition: background .15s; }
+        .modal-btn-cancel { background: rgba(255,255,255,0.05); color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1); }
+        .modal-btn-cancel:hover { background: rgba(255,255,255,0.09); }
+        .modal-btn-run { background: var(--blue); color: #fff; }
+        .modal-btn-run:hover { background: #3a8de0; }
+        .modal-btn-run:disabled { opacity: 0.5; cursor: not-allowed; }
+        .modal-info-note { font-size: 0.7rem; color: var(--text-muted); background: rgba(77,159,255,0.06); border: 1px solid rgba(77,159,255,0.15); border-radius: 6px; padding: 8px 10px; line-height: 1.5; }
+    </style>
+    <style>
+        /* ── LIGHT MODE ── */
+        html.light { color-scheme: light; --bg: #f1f2f4; --canvas-bg: #e8eaed; --node-bg: #ffffff; --node-border: rgba(0,0,0,0.1); --card-bg: #f7f7f9; --text: #18181b; --text-dim: #4a4c54; --text-muted: #8a8c9a; --panel-bg: #f7f7f9; --panel-border: rgba(0,0,0,0.09); --header-bg: #eaeaee; --accent: #2563eb; --blue: #2563eb; --blue-dark: #1e40af; --green: #16a34a; --amber: #d97706; --red: #dc2626; --purple: #7c3aed; --teal: #0d9488; }
+        html.light .step-body-inner { background: rgba(0,0,0,0.02); }
+        html.light .step-io-panel { background: rgba(255,255,255,0.8); }
+        html.light .step-resource-strip { background: rgba(0,0,0,0.04); }
+        html.light .substep-card { background: rgba(0,0,0,0.03); border-left-color: rgba(124,58,237,0.45); }
+        html.light .substep-num { background: rgba(124,58,237,0.1); border-color: rgba(124,58,237,0.25); color: #7c3aed; }
+        html.light .inst-step { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.07); }
+        html.light .consol-schema { background: #f0f4f8; color: #1e293b; }
+        html.light .siop-val code { background: rgba(0,0,0,0.07); color: #15803d; }
+        html.light ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); }
+    </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header class="app-header">
+    <div class="header-brand">Agent <span>Workflow</span></div>
+    <div class="header-sep"></div>
+    <span class="header-title">Process Library</span>
+    <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+        <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle light/dark mode"></button>
+        <a href="index.html" class="hbtn hbtn-ghost">&#8592; Back to Workflow</a>
+    </div>
+</header>
+
+<!-- ── BODY ── -->
+<div class="app-body">
+
+    <!-- Sidebar: process list -->
+    <nav class="sidebar">
+        <div class="sidebar-head">
+            <h2>Digital Workers</h2>
+            <input class="search-box" id="searchBox" type="text" placeholder="Search processes…" oninput="filterList()">
+        </div>
+        <div class="proc-list" id="procList">
+            <div class="sidebar-empty">Loading…</div>
+        </div>
+    </nav>
+
+    <!-- Main: process detail -->
+    <main class="main" id="main">
+        <div class="state-msg" id="statePlaceholder">
+            <div class="state-msg-icon">&#128196;</div>
+            <div class="state-msg-text">Select a process to view its details</div>
+        </div>
+        <div id="procDetail" style="display:none;"></div>
+    </main>
+
+</div>
+
+<!-- ── EXECUTE MODAL ── -->
+<div id="execModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeExecModal()">
+    <div class="modal-box">
+        <div class="modal-hdr">
+            <div>
+                <div class="modal-hdr-title" id="execModalTitle">Execute Step</div>
+                <div class="modal-hdr-sub" id="execModalSub"></div>
+            </div>
+            <button class="modal-close" onclick="closeExecModal()">&#x2715;</button>
+        </div>
+        <div class="modal-body" id="execModalBody"></div>
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-cancel" onclick="closeExecModal()">Cancel</button>
+            <button class="modal-btn modal-btn-run" id="execModalRunBtn" onclick="submitExecModal()">&#9654; Execute</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── Data ──
+let allWorkers    = [];   // [{worker_id, worker_name, description, processes:[]}]
+let ungrouped     = [];   // processes not linked to a worker
+let currentProcess = null;
+
+// ── Boot ──
+async function boot() {
+    try {
+        const res = await fetch('/api/orchestrator/processes');
+        if (!res.ok) throw new Error('Failed to load process list');
+        const data = await res.json();
+        allWorkers = data.workers    || [];
+        ungrouped  = data.ungrouped  || [];
+        renderHierarchy(allWorkers, ungrouped);
+    } catch (e) {
+        document.getElementById('procList').innerHTML =
+            `<div class="sidebar-empty" style="color:#ef4444;">Could not load processes.<br><span style="font-size:0.65rem;">${e.message}</span></div>`;
+    }
+}
+
+// ── Hierarchy render ──
+function renderHierarchy(workers, extra, query) {
+    const el = document.getElementById('procList');
+    let html = '';
+    const q = (query || '').toLowerCase();
+
+    for (const w of workers) {
+        const procs = q
+            ? w.processes.filter(p => matchesQuery(p, q))
+            : w.processes;
+
+        // Always show the worker group, even if no processes match (when not filtering)
+        // When filtering, skip workers with no matches
+        if (q && !procs.length) continue;
+
+        const groupId = 'wg-' + w.worker_id;
+        html += `
+        <div class="worker-group">
+            <div class="worker-group-hdr" onclick="toggleWorker('${groupId}')">
+                <div class="worker-icon">&#129302;</div>
+                <div class="worker-label">
+                    <div class="worker-role">Digital Worker</div>
+                    <div class="worker-name">${esc(w.worker_name)}</div>
+                </div>
+                ${procs.length ? `<span class="worker-proc-count">${procs.length}</span>` : ''}
+                <span class="worker-chev open" id="${groupId}-chev">&#9660;</span>
+            </div>
+            <div class="worker-body" id="${groupId}-body">
+                ${procs.length
+                    ? procs.map(p => procItemHTML(p)).join('')
+                    : '<div class="worker-empty">No processes assigned</div>'
+                }
+            </div>
+        </div>`;
+    }
+
+    // Ungrouped processes
+    const extraFiltered = q ? extra.filter(p => matchesQuery(p, q)) : extra;
+    if (extraFiltered.length) {
+        html += `<div class="ungrouped-title">Other</div>`;
+        html += extraFiltered.map(p => procItemHTML(p)).join('');
+    }
+
+    el.innerHTML = html || '<div class="sidebar-empty">No processes found.</div>';
+}
+
+function matchesQuery(p, q) {
+    return p.process_name.toLowerCase().includes(q) ||
+           p.process_id.toLowerCase().includes(q) ||
+           (p.summary || '').toLowerCase().includes(q);
+}
+
+function procItemHTML(p) {
+    const active = currentProcess && currentProcess.process_id === p.process_id;
+    return `
+    <div class="proc-item${active ? ' active' : ''}" onclick="${active ? 'reloadProcess()' : `selectProcess('${p.process_id}')`}">
+        <div class="proc-item-name">${esc(p.process_name)}</div>
+        <div class="proc-item-meta">
+            <span class="proc-item-steps">${p.step_count} step${p.step_count !== 1 ? 's' : ''}</span>
+            <span class="proc-item-ver">v${esc(p.version)}</span>
+        </div>
+    </div>`;
+}
+
+function toggleWorker(groupId) {
+    const body = document.getElementById(groupId + '-body');
+    const chev = document.getElementById(groupId + '-chev');
+    const collapsed = body.classList.toggle('collapsed');
+    chev.classList.toggle('open', !collapsed);
+}
+
+function filterList() {
+    const q = document.getElementById('searchBox').value;
+    renderHierarchy(allWorkers, ungrouped, q);
+}
+
+// ── Select & load ──
+async function selectProcess(processId) {
+    try {
+        const res = await fetch(`/api/orchestrator/process/${processId}`);
+        if (!res.ok) throw new Error('Failed to load process');
+        currentProcess = await res.json();
+        renderHierarchy(allWorkers, ungrouped, document.getElementById('searchBox').value);
+        renderDetail(currentProcess);
+    } catch (e) {
+        document.getElementById('procDetail').innerHTML =
+            `<div class="state-msg"><div class="state-msg-icon">&#9888;</div><div class="state-msg-text" style="color:#ef4444;">Error: ${e.message}</div></div>`;
+        document.getElementById('procDetail').style.display = 'block';
+        document.getElementById('statePlaceholder').style.display = 'none';
+    }
+}
+
+// ── Render detail ──
+const STEP_COLORS = ['c0','c1','c2','c3','c4'];
+
+function renderDetail(p) {
+    document.getElementById('statePlaceholder').style.display = 'none';
+    const el = document.getElementById('procDetail');
+    el.style.display = 'block';
+
+    const inp = p.process_input  || {};
+    const out = p.process_output || {};
+    const steps = p.steps || [];
+    const consol = p.consolidated_output || null;
+
+    el.innerHTML = `
+        <!-- Process header -->
+        <div class="proc-header">
+            <div class="proc-breadcrumb">
+                Process Library
+                ${p.worker_name ? `<span style="color:var(--text-muted);">›</span><span style="color:var(--text-dim);">${esc(p.worker_name)}</span>` : ''}
+                <span style="color:var(--text-muted);">›</span>
+                <span class="proc-id-chip">${esc(p.process_id)}</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+                <div class="proc-title" style="flex:1;">${esc(p.process_name)}</div>
+                <button class="hbtn hbtn-ghost" style="flex-shrink:0;margin-top:2px;" onclick="reloadProcess()" title="Reload from JSON file">&#8635; Reload</button>
+            </div>
+            <div class="proc-meta-row">
+                <span class="proc-badge version">v${esc(p.version || '1.0')}</span>
+                <span class="proc-badge steps">${steps.length} Step${steps.length !== 1 ? 's' : ''}</span>
+                ${p.worker_name ? `<span class="proc-badge" style="background:rgba(77,159,255,0.08);color:var(--blue);border:1px solid rgba(77,159,255,0.2);">&#129302; ${esc(p.worker_name)}</span>` : ''}
+            </div>
+            <div class="proc-summary">${esc(p.summary || '')}</div>
+        </div>
+
+        <!-- Search context -->
+        ${p.search_context ? `
+        <div class="search-ctx-card">
+            <div class="search-ctx-title">&#128269; Document Search Context</div>
+            <div class="search-ctx-body">${highlightSearchCtx(p.search_context)}</div>
+        </div>` : ''}
+
+        <!-- Process-level I/O -->
+        <div class="io-grid">
+            <div class="io-card input">
+                <div class="io-card-title"><span class="dot"></span>Process Input</div>
+                <div class="io-desc">${esc(inp.description || '')}</div>
+                ${renderIOFields(inp.required_fields, 'required')}
+                ${inp.format ? `<div class="io-field" style="margin-top:6px;"><span class="io-field-key">format</span><span class="io-field-val">${esc(inp.format)}</span></div>` : ''}
+                ${inp.example ? `<div class="io-field"><span class="io-field-key">example</span><span class="io-field-val" style="font-family:monospace;font-size:0.67rem;color:#86efac;">${esc(inp.example)}</span></div>` : ''}
+            </div>
+            <div class="io-card output">
+                <div class="io-card-title"><span class="dot"></span>Process Output</div>
+                <div class="io-desc">${esc(out.description || '')}</div>
+                ${renderIOFields(out.required_fields, 'required')}
+                ${out.format ? `<div class="io-field" style="margin-top:6px;"><span class="io-field-key">format</span><span class="io-field-val">${esc(out.format)}</span></div>` : ''}
+            </div>
+        </div>
+
+        <!-- Steps -->
+        <div class="steps-title">Process Steps</div>
+        ${steps.map((s, i) => renderStep(s, i)).join('')}
+
+        <!-- Consolidated output -->
+        ${consol ? renderConsolidated(consol) : ''}
+    `;
+
+    // Initialise per-process execution state
+    initProcExec(p);
+}
+
+function renderIOFields(fields, label) {
+    if (!fields || !fields.length) return '';
+    return `<div class="io-fields">${fields.map(f =>
+        `<div class="io-field"><span class="io-field-key">${esc(f)}</span><span class="io-field-val" style="color:#555;font-size:0.65rem;">${label}</span></div>`
+    ).join('')}</div>`;
+}
+
+function renderStep(s, i) {
+    const color = STEP_COLORS[i % STEP_COLORS.length];
+    const ei = s.expected_input  || {};
+    const eo = s.expected_output || {};
+    const ai = s.actual_input    || {};
+    const ao = s.actual_output   || {};
+    const id = `step-${i}`;
+    const sn = i; // step index used in procExec
+
+    return `
+    <div class="step-card" id="${id}">
+        <div class="step-hdr" onclick="toggleStep('${id}')">
+            <div class="step-num ${color}">${s.step_number}</div>
+            <div class="step-info">
+                <div class="step-name">${esc(s.step_name)}</div>
+                <div class="step-summary-short">${esc(s.summary || '')}</div>
+            </div>
+            <div class="step-chips">
+                ${ai.agent_id ? `<span class="step-chip agent">${esc(ai.agent_id)}</span>` : ''}
+                ${ai.tool_id  ? `<span class="step-chip tool">${esc(ai.tool_id)}</span>`   : ''}
+            </div>
+            <span class="status-badge" id="step-badge-${sn}"></span>
+            <button class="step-exec-btn" id="step-exec-btn-${sn}"
+                onclick="event.stopPropagation();onExecClick(${sn})"
+                title="Execute this step independently">&#9654; Execute</button>
+            <span class="step-chev open" id="${id}-chev">&#9660;</span>
+        </div>
+        <div class="step-body open" id="${id}-body">
+            <div class="step-body-inner">
+
+                <!-- Details -->
+                <div>
+                    <div class="step-section-title">Details</div>
+                    <div class="step-details-text">${esc(s.details || s.summary || '')}</div>
+                </div>
+
+                <!-- Expected I/O -->
+                <div>
+                    <div class="step-section-title">Expected Input &amp; Output</div>
+                    <div class="step-io-grid">
+                        <div class="step-io-panel expected-in">
+                            <div class="siop-title">Expected Input</div>
+                            <div class="siop-desc">${esc(ei.description || '')}</div>
+                            ${renderSiopFields(ei.fields)}
+                        </div>
+                        <div class="step-io-panel expected-out">
+                            <div class="siop-title">Expected Output</div>
+                            <div class="siop-desc">${esc(eo.description || '')}</div>
+                            ${renderSiopFields(eo.fields)}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actual I/O -->
+                <div>
+                    <div class="step-section-title">System Input &amp; Output</div>
+                    <div class="step-io-grid">
+                        <div class="step-io-panel actual-in">
+                            <div class="siop-title">Actual Input</div>
+                            <div class="siop-desc">${esc(ai.source || '')}</div>
+                            ${ai.endpoint ? `<div class="siop-field"><span class="siop-key">endpoint</span><span class="siop-val"><code>${esc(ai.endpoint)}</code></span></div>` : ''}
+                        </div>
+                        <div class="step-io-panel actual-out">
+                            <div class="siop-title">Actual Output</div>
+                            ${ao.stored_as    ? `<div class="siop-field"><span class="siop-key">stored as</span><span class="siop-val"><code>${esc(ao.stored_as)}</code></span></div>` : ''}
+                            ${ao.file_pattern ? `<div class="siop-field"><span class="siop-key">file pattern</span><span class="siop-val"><code>${esc(ao.file_pattern)}</code></span></div>` : ''}
+                            ${ao.key_used_by_next_step ? `<div class="siop-field"><span class="siop-key">next step key</span><span class="siop-val"><code>${esc(ao.key_used_by_next_step)}</code></span></div>` : ''}
+                        </div>
+                    </div>
+                </div>
+                ${s.sub_steps && s.sub_steps.length ? renderSubSteps(s.sub_steps, i) : ''}
+
+            </div>
+
+            <!-- Resource strip -->
+            <div class="step-resource-strip">
+                ${ai.agent_id    ? `<span class="res-pill agent">&#129302; ${esc(ai.agent_id)}</span>` : ''}
+                ${ai.tool_id     ? `<span class="res-pill tool">&#128295; ${esc(ai.tool_id)}</span>` : ''}
+                ${ai.endpoint    ? `<span class="res-pill endpoint">${esc(ai.endpoint)}</span>` : ''}
+                ${ao.stored_as   ? `<span class="res-pill stored">&#128190; ${esc(ao.stored_as)}</span>` : ''}
+            </div>
+
+            <!-- Step output panel (shown after execution) -->
+            <div class="step-output-panel" id="step-output-${sn}">
+                <div class="step-out-toolbar">
+                    <span class="step-out-title">&#10003; Step Output</span>
+                    <button class="step-out-close" onclick="document.getElementById('step-output-${sn}').classList.remove('open')">&#x2715; Close</button>
+                </div>
+                <div id="step-out-content-${sn}"></div>
+            </div>
+        </div>
+    </div>`;
+}
+
+function renderSubSteps(subSteps, stepIdx) {
+    const cards = subSteps.map((ss, j) => {
+        const details = (ss.details || '').trim();
+        const instSteps = ss.instructional_sub_steps || [];
+        const instHtml = instSteps.length ? `
+            <div class="instructional-steps">
+                ${instSteps.map((ist, k) => `
+                <div class="inst-step">
+                    <div class="inst-step-title">
+                        <span class="inst-step-num">${k + 1}</span>
+                        ${esc(ist.title || '')}
+                    </div>
+                    <div class="inst-step-text">${esc(ist.instructions || '')}</div>
+                </div>`).join('')}
+            </div>` : '';
+        const hasBody = details || instHtml;
+        return `
+        <div class="substep-card">
+            <div class="substep-hdr">
+                <span class="substep-num">${j + 1}</span>
+                <span class="substep-id-chip">${esc(ss.sub_step_id || '')}</span>
+                <span class="substep-name">${esc(ss.sub_step_name || '')}</span>
+            </div>
+            ${hasBody ? `<div class="substep-body">
+                ${details ? `<div class="substep-details">${esc(details)}</div>` : ''}
+                ${instHtml}
+            </div>` : ''}
+        </div>`;
+    }).join('');
+    return `
+    <div class="substeps-section">
+        <div class="substeps-title">Sub-Steps (${subSteps.length})</div>
+        <div class="substep-list">${cards}</div>
+    </div>`;
+}
+
+function renderSiopFields(fields) {
+    if (!fields || typeof fields !== 'object') return '';
+    return Object.entries(fields).map(([k, v]) =>
+        `<div class="siop-field"><span class="siop-key">${esc(k)}</span><span class="siop-val">${esc(String(v))}</span></div>`
+    ).join('');
+}
+
+function highlightSearchCtx(text) {
+    // Escape first, then wrap key phrases in <em> for teal highlighting
+    let s = esc(text);
+    const highlights = [
+        'Method of Supply Requirement', 'Determination of Funding Requirements',
+        'Substation Notes', 'Sub Notes', 'Design Brief', 'Site Plan',
+        'HV Works', 'LV Works', 'SL Works', 'Earthing', 'Easements',
+        'Transformer Size', 'HV Switchgear', 'Voltage Level', 'Cubicle Size',
+        'RETIC', 'DWG', 'BRIEF', 'DESIGN_BRIEF', 'ARP',
+        'document_category', 'Siemens RLR', '1.5MVA',
+    ];
+    highlights.forEach(kw => {
+        const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        s = s.replace(new RegExp(`(${escaped})`, 'g'), '<em>$1</em>');
+    });
+    return s;
+}
+
+function renderConsolidated(c) {
+    return `
+    <div class="consol-card" style="margin-bottom:32px;">
+        <div class="consol-title">Consolidated Output</div>
+        <div class="consol-desc">${esc(c.description || '')}</div>
+        ${c.file_pattern ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">File pattern: <code style="font-family:monospace;color:#86efac;background:rgba(255,255,255,0.05);padding:1px 5px;border-radius:3px;">${esc(c.file_pattern)}</code></div>` : ''}
+        ${c.structure ? `<pre class="consol-schema">${esc(JSON.stringify(c.structure, null, 2))}</pre>` : ''}
+    </div>`;
+}
+
+// ── Reload current process from JSON ──
+async function reloadProcess() {
+    if (!currentProcess) return;
+    const btn = document.querySelector('.proc-header button');
+    if (btn) { btn.textContent = '⟳ Loading…'; btn.disabled = true; }
+    await selectProcess(currentProcess.process_id);
+}
+
+// ── Toggle step ──
+function toggleStep(id) {
+    const body = document.getElementById(id + '-body');
+    const chev = document.getElementById(id + '-chev');
+    const isOpen = body.classList.contains('open');
+    body.classList.toggle('open', !isOpen);
+    chev.classList.toggle('open', !isOpen);
+}
+
+// ── Util ──
+function esc(s) {
+    return String(s ?? '')
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;');
+}
+
+function toggleTheme() {
+    const light = document.documentElement.classList.toggle('light');
+    localStorage.setItem('theme', light ? 'light' : 'dark');
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.textContent = light ? '🌙' : '☀️';
+}
+(function(){ const b=document.getElementById('themeToggleBtn'); if(b) b.textContent=document.documentElement.classList.contains('light')?'🌙':'☀️'; })();
+
+// ════════════════════════════════════════════════════════
+//  PROCESS EXECUTION STATE
+// ════════════════════════════════════════════════════════
+
+// procExec tracks the per-process execution session
+// statuses: 'idle' | 'running' | 'done' | 'error'
+let procExec = {
+    planId:   null,
+    process:  null,
+    statuses: [],   // per step index
+    outputs:  [],   // per step index (raw response JSON)
+    activeStep: null,
+};
+
+function initProcExec(p) {
+    procExec = {
+        planId:   null,
+        process:  p,
+        statuses: (p.steps || []).map(() => 'idle'),
+        outputs:  (p.steps || []).map(() => null),
+        activeStep: null,
+    };
+    updateAllStepButtons();
+}
+
+// ── Map a process step to an orchestrator PlanStep ──
+function stepToPlanStep(step) {
+    const ai = step.actual_input  || {};
+    const ao = step.actual_output || {};
+    const res = {};
+    if (ai.agent_id)    res.agent_id    = ai.agent_id;
+    if (ai.tool_id)     res.tool_id     = ai.tool_id;
+    if (ai.knowledge_id) res.knowledge_id = ai.knowledge_id;
+    return {
+        step_number: step.step_number,
+        name:        step.step_name,
+        description: step.details || step.summary || step.step_name,
+        assigned_resource_id: ai.agent_id || ai.tool_id || null,
+        required_resources: Object.keys(res).length ? res : null,
+    };
+}
+
+// ── Determine what user inputs a step needs ──
+function getStepInputMode(step) {
+    const ai = step.actual_input || {};
+    const agentId = (ai.agent_id || '').toLowerCase();
+    const toolId  = (ai.tool_id  || '').toLowerCase();
+    // document-reviewer /plan_processing or similar → needs folder_path
+    if (agentId.includes('document') && agentId.includes('reviewer')) return 'folder';
+    // extractor steps: folder already in state; no extra user input needed
+    if (agentId.includes('document') && agentId.includes('extractor')) return 'auto';
+    // validator: no user input
+    if (agentId.includes('validator') || toolId.includes('validator')) return 'auto';
+    // mapper / verifier: no user input
+    if (agentId.includes('mapper') || agentId.includes('verif')) return 'auto';
+    // fallback: show folder input
+    return 'folder';
+}
+
+// ── Execute button click ──
+function onExecClick(stepIdx) {
+    if (!procExec.process) return;
+    const step = procExec.process.steps[stepIdx];
+    if (!step) return;
+    const mode = getStepInputMode(step);
+    showExecModal(stepIdx, step, mode);
+}
+
+// ── Modal ──
+let _modalStepIdx = null;
+let _modalMode    = null;
+
+function showExecModal(stepIdx, step, mode) {
+    _modalStepIdx = stepIdx;
+    _modalMode    = mode;
+
+    document.getElementById('execModalTitle').textContent = `Execute: ${step.step_name}`;
+    document.getElementById('execModalSub').textContent   = `Step ${step.step_number} · ${step.summary || ''}`;
+
+    const body = document.getElementById('execModalBody');
+
+    // Check if a previous step has output we'll chain from
+    const prevOutputs = procExec.outputs.slice(0, stepIdx).filter(Boolean);
+    const chainNote = prevOutputs.length
+        ? `<div class="modal-info-note">&#128279; This step will automatically use output from step${prevOutputs.length > 1 ? 's' : ''} ${procExec.outputs.slice(0,stepIdx).map((o,i)=>o?i+1:null).filter(Boolean).join(', ')}.</div>`
+        : '';
+
+    if (mode === 'folder') {
+        body.innerHTML = `
+            ${chainNote}
+            <div class="modal-field">
+                <label class="modal-label">Documents Folder Path <span>folder_path</span></label>
+                <input class="modal-input" id="execFolderInput" type="text" value="/documents" placeholder="/documents" />
+                <div class="modal-hint">Absolute path to the folder containing documents to process.</div>
+            </div>`;
+        setTimeout(() => { const el = document.getElementById('execFolderInput'); if(el){el.select();} }, 50);
+    } else {
+        body.innerHTML = `
+            ${chainNote}
+            <div class="modal-info-note">&#9889; This step runs automatically using outputs from previous steps. No additional input required.</div>`;
+    }
+
+    document.getElementById('execModalRunBtn').disabled = false;
+    document.getElementById('execModal').style.display = 'flex';
+}
+
+function closeExecModal() {
+    document.getElementById('execModal').style.display = 'none';
+    _modalStepIdx = null;
+    _modalMode    = null;
+}
+
+async function submitExecModal() {
+    const stepIdx = _modalStepIdx;
+    const mode    = _modalMode;
+    if (stepIdx === null) return;
+
+    let inputs = {};
+    if (mode === 'folder') {
+        const val = (document.getElementById('execFolderInput') || {}).value || '/documents';
+        inputs.folder_path = val.trim() || '/documents';
+    }
+
+    document.getElementById('execModalRunBtn').disabled = true;
+    closeExecModal();
+    await executeStep(stepIdx, inputs);
+}
+
+// ── Core execution ──
+async function executeStep(stepIdx, inputs) {
+    const p = procExec.process;
+    if (!p) return;
+
+    // Set running state
+    procExec.statuses[stepIdx] = 'running';
+    updateStepUI(stepIdx);
+
+    try {
+        // Create plan if not yet created
+        if (!procExec.planId) {
+            const planSteps = (p.steps || []).map(s => stepToPlanStep(s));
+            const resp = await fetch('/api/orchestrator/execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    plan_overview: `Process execution: ${p.process_name}`,
+                    steps: planSteps
+                })
+            });
+            if (!resp.ok) throw new Error(`Failed to create plan (${resp.status})`);
+            const planData = await resp.json();
+            procExec.planId = planData.plan_id;
+        }
+
+        // Build form data for run_next
+        const fd = new FormData();
+        if (inputs.folder_path) {
+            fd.append('folder_path', inputs.folder_path);
+        }
+
+        const runResp = await fetch(`/api/orchestrator/run_next/${procExec.planId}`, {
+            method: 'POST',
+            body: fd
+        });
+        if (!runResp.ok) {
+            const errText = await runResp.text();
+            throw new Error(`Step failed (${runResp.status}): ${errText.slice(0, 200)}`);
+        }
+
+        const result = await runResp.json();
+        procExec.outputs[stepIdx] = result;
+
+        if (result.status === 'error' || result.failed) {
+            procExec.statuses[stepIdx] = 'error';
+        } else {
+            procExec.statuses[stepIdx] = 'done';
+        }
+    } catch (e) {
+        procExec.outputs[stepIdx] = { error: e.message };
+        procExec.statuses[stepIdx] = 'error';
+    }
+
+    updateStepUI(stepIdx);
+    showStepOutput(stepIdx);
+    updateAllStepButtons();
+}
+
+// ── UI updates ──
+function updateStepUI(stepIdx) {
+    const status = procExec.statuses[stepIdx];
+    const badge  = document.getElementById(`step-badge-${stepIdx}`);
+    const btn    = document.getElementById(`step-exec-btn-${stepIdx}`);
+    if (!badge || !btn) return;
+
+    // Badge
+    badge.className = 'status-badge ' + status;
+    if (status === 'idle')    { badge.textContent = ''; badge.className = 'status-badge'; }
+    if (status === 'running') { badge.textContent = '⟳ Running…'; }
+    if (status === 'done')    { badge.textContent = '✓ Done'; }
+    if (status === 'error')   { badge.textContent = '✕ Error'; }
+
+    // Button label / style
+    btn.className = 'step-exec-btn' + (status === 'done' ? ' done' : status === 'error' ? ' error' : '');
+    btn.disabled  = (status === 'running');
+    if (status === 'running') btn.textContent = '⟳ Running…';
+    else if (status === 'done')  btn.textContent = '↺ Re-run';
+    else if (status === 'error') btn.textContent = '↺ Retry';
+    else                         btn.innerHTML   = '&#9654; Execute';
+}
+
+function updateAllStepButtons() {
+    if (!procExec.process) return;
+    (procExec.process.steps || []).forEach((_, i) => updateStepUI(i));
+}
+
+function showStepOutput(stepIdx) {
+    const output  = procExec.outputs[stepIdx];
+    const panel   = document.getElementById(`step-output-${stepIdx}`);
+    const content = document.getElementById(`step-out-content-${stepIdx}`);
+    if (!panel || !content || !output) return;
+
+    const isError = procExec.statuses[stepIdx] === 'error';
+    if (isError) {
+        content.innerHTML = `<div class="step-out-error">${esc(output.error || JSON.stringify(output, null, 2))}</div>`;
+        panel.style.borderTopColor = 'var(--red)';
+        panel.querySelector('.step-out-title').textContent = '✕ Step Error';
+    } else {
+        content.innerHTML = `<div class="step-out-json">${esc(JSON.stringify(output, null, 2))}</div>`;
+        panel.style.borderTopColor = 'var(--green)';
+        panel.querySelector('.step-out-title').textContent = '✓ Step Output';
+    }
+    panel.classList.add('open');
+
+    // Ensure step body is open so output is visible
+    const stepBody = document.getElementById(`step-${stepIdx}-body`);
+    const stepChev = document.getElementById(`step-${stepIdx}-chev`);
+    if (stepBody) stepBody.classList.add('open');
+    if (stepChev) stepChev.classList.add('open');
+}
+
+// ── Init ──
+boot();
+</script>
+</body>
+</html>
