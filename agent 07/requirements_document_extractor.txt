@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-dotenv
+openai
+google-genai
+anthropic
+pdfplumber
+Pillow
+python-docx
+openpyxl
+xlrd

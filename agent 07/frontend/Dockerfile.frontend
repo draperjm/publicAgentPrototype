@@ -1,0 +1,26 @@
+# Dockerfile.frontend
+# Build context: agent 07/frontend/
+# nginx.aca.conf and entrypoint-nginx.sh are copied here by deploy.sh before build.
+FROM nginx:alpine
+
+# Copy HTML files
+COPY index.html /usr/share/nginx/html/index.html
+COPY login.html /usr/share/nginx/html/login.html
+COPY validation_report.html /usr/share/nginx/html/validation_report.html
+COPY processes.html /usr/share/nginx/html/processes.html
+COPY extractions.html /usr/share/nginx/html/extractions.html
+COPY test_report.html /usr/share/nginx/html/test_report.html
+COPY report.html /usr/share/nginx/html/report.html
+COPY analysis_report.html /usr/share/nginx/html/analysis_report.html
+COPY variance_viewer.html /usr/share/nginx/html/variance_viewer.html
+
+# Nginx config with RESOLVER_PLACEHOLDER (injected at runtime by entrypoint)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Entrypoint: injects system DNS resolver IP, then starts nginx
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 80
+
+ENTRYPOINT ["/entrypoint.sh"]

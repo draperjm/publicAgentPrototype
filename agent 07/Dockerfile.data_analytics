@@ -1,0 +1,12 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements_data_analytics.txt .
+RUN pip install --no-cache-dir -r requirements_data_analytics.txt
+
+COPY data_analytics_agent.py .
+
+EXPOSE 8092
+
+CMD ["uvicorn", "data_analytics_agent:app", "--host", "0.0.0.0", "--port", "8092"]
