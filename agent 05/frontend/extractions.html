@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Document Extractions</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%22 height=%2232%22 rx=%226%22 fill=%22%23161616%22/%3E%3Crect x=%228%22 y=%2210%22 width=%2216%22 height=%2212%22 rx=%223%22 fill=%22none%22 stroke=%22%234d9fff%22 stroke-width=%222%22/%3E%3Ccircle cx=%2212%22 cy=%2216%22 r=%221.5%22 fill=%22%234d9fff%22/%3E%3Ccircle cx=%2220%22 cy=%2216%22 r=%221.5%22 fill=%22%234d9fff%22/%3E%3Crect x=%2214%22 y=%227%22 width=%224%22 height=%223%22 rx=%221%22 fill=%22%234d9fff%22/%3E%3C/svg%3E">
+<script>(function(){if(localStorage.getItem('theme')==='light')document.documentElement.classList.add('light');})()</script>
+<style>
+    :root {
+        --bg: #0e0e10;
+        --panel-bg: #141417;
+        --panel-border: rgba(255,255,255,0.07);
+        --header-bg: #111114;
+        --text: #e0e0e0;
+        --text-dim: #a0a0a0;
+        --text-muted: #606070;
+        --accent: #4d9fff;
+        --node-bg: #1a1a1f;
+        --node-border: rgba(255,255,255,0.09);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 14px; }
+
+    /* ── HEADER ── */
+    .hdr { height: 48px; background: var(--header-bg); border-bottom: 1px solid var(--panel-border); display: flex; align-items: center; gap: 14px; padding: 0 18px; flex-shrink: 0; }
+    .hdr-back { font-size: 0.72rem; color: var(--text-muted); text-decoration: none; display: flex; align-items: center; gap: 5px; padding: 4px 10px; border: 1px solid var(--panel-border); border-radius: 5px; transition: color .15s, border-color .15s; }
+    .hdr-back:hover { color: var(--text); border-color: rgba(255,255,255,0.18); }
+    .hdr-title { font-size: 0.88rem; font-weight: 700; }
+    .hdr-spacer { flex: 1; }
+    .hdr-count { font-size: 0.7rem; color: var(--text-muted); padding: 3px 10px; border: 1px solid var(--panel-border); border-radius: 10px; }
+
+    /* ── LAYOUT ── */
+    .body { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+    /* ── FILE TREE ── */
+    .tree-panel { width: 260px; flex-shrink: 0; background: var(--panel-bg); border-right: 1px solid var(--panel-border); display: flex; flex-direction: column; overflow: hidden; }
+    .tree-hdr { padding: 10px 14px 8px; border-bottom: 1px solid var(--panel-border); flex-shrink: 0; }
+    .tree-hdr-title { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--text-muted); }
+    .tree-search { margin-top: 7px; width: 100%; background: rgba(255,255,255,0.04); border: 1px solid var(--panel-border); border-radius: 5px; color: var(--text); font-size: 0.72rem; padding: 5px 9px; outline: none; }
+    .tree-search:focus { border-color: var(--accent); }
+    .tree-scroll { flex: 1; overflow-y: auto; padding: 6px 0; }
+    .tree-scroll::-webkit-scrollbar { width: 4px; }
+    .tree-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+    .tg-date { padding: 8px 14px 3px; font-size: 0.59rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+    .tg-date::before { content:''; display:block; width:8px; height:1px; background:var(--panel-border); }
+    .tg-date::after  { content:''; flex:1; height:1px; background:var(--panel-border); }
+    .tg-run { margin: 2px 6px; }
+    .tg-run-hdr { display: flex; align-items: center; gap: 6px; padding: 5px 8px; cursor: pointer; border-radius: 5px; background: rgba(255,255,255,0.02); }
+    .tg-run-hdr:hover { background: rgba(255,255,255,0.05); }
+    .tg-run-time { font-size: 0.72rem; font-weight: 600; color: var(--text-dim); }
+    .tg-run-badge { font-size: 0.58rem; padding: 1px 6px; border-radius: 8px; background: rgba(77,159,255,0.12); color: var(--accent); border: 1px solid rgba(77,159,255,0.2); margin-left: auto; }
+    .tg-run-chev { font-size: 0.6rem; color: var(--text-muted); transition: transform .15s; }
+    .tg-run-chev.open { transform: rotate(90deg); }
+    .tg-run-body { padding-left: 8px; }
+    .tfile { display: flex; align-items: center; gap: 6px; padding: 4px 8px 4px 12px; cursor: pointer; border-radius: 5px; margin: 1px 3px; transition: background .1s; }
+    .tfile:hover { background: rgba(255,255,255,0.04); }
+    .tfile.sel { background: rgba(77,159,255,0.1); }
+    .tfile-icon { font-size: 0.72rem; flex-shrink: 0; }
+    .tfile-name { font-size: 0.67rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+    .tfile.sel .tfile-name { color: var(--accent); }
+    .tfile-size { font-size: 0.57rem; color: var(--text-muted); flex-shrink: 0; }
+    .tg-standalone { padding: 1px 6px; }
+
+    /* ── CONTENT PANEL ── */
+    .content-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+    .content-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); gap: 10px; }
+    .content-empty-icon { font-size: 2.5rem; opacity: 0.22; }
+    .content-empty-txt { font-size: 0.82rem; opacity: 0.45; }
+
+    /* standard scroll mode (non-extraction files) */
+    .content-scroll { flex: 1; overflow-y: auto; padding: 20px 24px; min-height: 0; }
+    .content-scroll::-webkit-scrollbar { width: 6px; }
+    .content-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+    /* ── SPLIT VIEW (extraction files) ── */
+    .split-wrap { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; }
+    .split-topbar { padding: 14px 18px 10px; flex-shrink: 0; border-bottom: 1px solid var(--panel-border); background: var(--panel-bg); }
+    .split-docbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .split-doctab { font-size: 0.7rem; padding: 4px 12px; border-radius: 5px; cursor: pointer; border: 1px solid var(--panel-border); color: var(--text-dim); background: transparent; transition: all .15s; }
+    .split-doctab.active { background: rgba(77,159,255,0.12); border-color: rgba(77,159,255,0.3); color: var(--accent); }
+    .split-cols { flex: 1; display: flex; overflow: hidden; min-height: 0; }
+    .split-left  { flex: 1; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid var(--panel-border); min-width: 0; }
+    .split-right { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+    .split-pane-hdr { display: flex; align-items: center; gap: 8px; padding: 9px 14px 7px; border-bottom: 1px solid var(--panel-border); background: rgba(255,255,255,0.01); flex-shrink: 0; }
+    .split-pane-title { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--text-muted); }
+    .split-pane-count { font-size: 0.6rem; padding: 1px 6px; border-radius: 8px; background: rgba(255,255,255,0.06); color: var(--text-muted); }
+    .split-pane-hint { font-size: 0.6rem; color: var(--text-muted); margin-left: auto; font-style: italic; }
+    .split-pane-body { flex: 1; overflow-y: auto; padding: 12px; min-height: 0; }
+    .split-pane-body::-webkit-scrollbar { width: 5px; }
+    .split-pane-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+    /* ── EXTRACTION CATEGORIES (left pane) ── */
+    .cat-grid { display: flex; flex-direction: column; gap: 6px; }
+    .cat-card { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.06); border-radius: 7px; overflow: hidden; }
+    .cat-hdr { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; }
+    .cat-hdr:hover { background: rgba(255,255,255,0.04); }
+    .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .cat-name { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+    .cat-count { font-size: 0.6rem; color: var(--text-muted); margin-left: auto; }
+    .cat-chev { font-size: 0.58rem; color: var(--text-muted); transition: transform .15s; }
+    .cat-chev.open { transform: rotate(90deg); }
+    .cat-body { padding: 6px 8px; display: flex; flex-direction: column; gap: 5px; }
+    .cat-item { padding: 7px 9px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 5px; cursor: pointer; transition: background .12s, border-color .12s; }
+    .cat-item:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.12); }
+    .cat-item.active { background: rgba(77,159,255,0.08); border-color: rgba(77,159,255,0.3); }
+    .cat-item-desc { font-size: 0.71rem; color: var(--text); line-height: 1.4; margin-bottom: 3px; }
+    .cat-item-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+    .cat-meta-pill { font-size: 0.58rem; padding: 1px 6px; border-radius: 8px; background: rgba(255,255,255,0.04); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.07); }
+    .cat-meta-pill.src-link { background: rgba(77,159,255,0.08); color: #7ab8ff; border-color: rgba(77,159,255,0.2); }
+    .cat-item-raw { font-family: 'Courier New', monospace; font-size: 0.62rem; color: #8a9aaa; line-height: 1.4; }
+
+    /* ── SOURCE SECTIONS (right pane) ── */
+    .src-sec { background: var(--node-bg); border: 1px solid var(--node-border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; transition: border-color .2s, box-shadow .2s, opacity .2s; }
+    .src-sec.dimmed { opacity: 0.28; }
+    .src-sec.highlighted { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(77,159,255,0.18), 0 4px 20px rgba(77,159,255,0.1); opacity: 1 !important; }
+    .src-sec-hdr { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .src-sec-score-bar { width: 3px; border-radius: 2px; align-self: stretch; flex-shrink: 0; }
+    .src-sec-name { font-size: 0.74rem; font-weight: 700; flex: 1; }
+    .src-sec-page { font-size: 0.6rem; color: var(--text-muted); }
+    .src-sec-score { font-size: 0.65rem; font-weight: 700; padding: 1px 6px; border-radius: 8px; }
+    .src-sec-tags { display: flex; flex-wrap: wrap; gap: 3px; padding: 5px 12px 6px; }
+    .src-sec-tag { font-size: 0.57rem; padding: 1px 6px; border-radius: 8px; background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.07); }
+    .src-sec-tag.relevant { background: rgba(77,159,255,0.1); color: var(--accent); border-color: rgba(77,159,255,0.2); }
+    .src-sec-text { padding: 8px 12px 10px; font-family: 'Courier New', monospace; font-size: 0.65rem; color: #8898a8; line-height: 1.58; white-space: pre-wrap; word-break: break-word; border-top: 1px solid rgba(255,255,255,0.04); max-height: 220px; overflow-y: auto; }
+    .src-sec.highlighted .src-sec-text { color: #b8c8d8; background: rgba(77,159,255,0.04); }
+    .src-sec-reason { padding: 4px 12px 7px; font-size: 0.65rem; color: var(--text-muted); font-style: italic; border-top: 1px solid rgba(255,255,255,0.04); }
+    .src-sec.highlighted .src-sec-reason { color: #8898a8; }
+    .src-sec-table { margin: 4px 12px 8px; }
+    .src-table { width: 100%; border-collapse: collapse; font-size: 0.63rem; }
+    .src-table th { text-align: left; padding: 4px 8px; background: rgba(255,255,255,0.04); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.07); font-weight: 600; }
+    .src-table td { padding: 4px 8px; border: 1px solid rgba(255,255,255,0.05); color: var(--text-dim); vertical-align: top; }
+
+    /* ── SHARED COMPONENTS ── */
+    .page-title { font-size: 1rem; font-weight: 700; }
+    .page-sub { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+    .stat-bar { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 10px; padding: 10px 14px; background: var(--node-bg); border: 1px solid var(--node-border); border-radius: 7px; }
+    .stat-item { display: flex; flex-direction: column; gap: 2px; }
+    .stat-val { font-size: 1rem; font-weight: 700; }
+    .stat-lbl { font-size: 0.6rem; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
+    .stat-sep { width: 1px; background: var(--panel-border); align-self: stretch; }
+    .section-title { font-size: 0.63rem; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--text-muted); margin: 18px 0 8px; display: flex; align-items: center; gap: 8px; }
+    .section-title::after { content:''; flex:1; height:1px; background:var(--panel-border); }
+    .badge { display: inline-flex; align-items: center; font-size: 0.61rem; padding: 2px 7px; border-radius: 10px; font-weight: 600; }
+    .badge-blue  { background: rgba(77,159,255,0.12); color: #7ab8ff; border: 1px solid rgba(77,159,255,0.22); }
+    .badge-green { background: rgba(34,197,94,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.22); }
+    .badge-amber { background: rgba(245,158,11,0.12); color: #fcd34d; border: 1px solid rgba(245,158,11,0.22); }
+    .badge-red   { background: rgba(239,68,68,0.12); color: #fca5a5; border: 1px solid rgba(239,68,68,0.22); }
+    .badge-teal  { background: rgba(20,184,166,0.12); color: #5eead4; border: 1px solid rgba(20,184,166,0.22); }
+    .badge-gray  { background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--panel-border); }
+
+    /* ── NON-EXTRACTION VIEWS ── */
+    .dr-doc-card { background: var(--node-bg); border: 1px solid var(--node-border); border-radius: 8px; padding: 12px 16px; margin-bottom: 10px; display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start; }
+    .dr-doc-icon { font-size: 1.3rem; padding-top: 2px; }
+    .dr-doc-filename { font-size: 0.8rem; font-weight: 700; margin-bottom: 3px; }
+    .dr-doc-title { font-size: 0.71rem; color: var(--text-muted); margin-bottom: 6px; }
+    .dr-meta-row { display: flex; flex-wrap: wrap; gap: 5px 12px; }
+    .dr-meta-item { display: flex; gap: 4px; align-items: center; }
+    .dr-meta-lbl { font-size: 0.59rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+    .dr-meta-val { font-size: 0.67rem; color: var(--text-dim); }
+    .dr-conf { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+    .dr-conf-val { font-size: 0.9rem; font-weight: 700; }
+    .dr-conf-bar { width: 60px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08); overflow: hidden; }
+    .dr-conf-fill { height: 100%; border-radius: 2px; }
+    .scan-table { width: 100%; border-collapse: collapse; font-size: 0.71rem; }
+    .scan-table th { text-align: left; padding: 6px 10px; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); border-bottom: 1px solid var(--panel-border); }
+    .scan-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle; }
+    .scan-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .plan-table { width: 100%; border-collapse: collapse; font-size: 0.71rem; }
+    .plan-table th { text-align: left; padding: 7px 12px; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); background: var(--panel-bg); border-bottom: 1px solid var(--panel-border); position: sticky; top: 0; }
+    .plan-table td { padding: 9px 12px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: top; line-height: 1.45; }
+    .plan-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .plan-notes { font-size: 0.65rem; color: var(--text-muted); margin-top: 3px; }
+    .test-case { background: var(--node-bg); border: 1px solid var(--node-border); border-radius: 7px; margin-bottom: 8px; overflow: hidden; }
+    .test-case-hdr { display: flex; align-items: center; gap: 10px; padding: 9px 14px; }
+    .test-case-name { font-size: 0.74rem; font-weight: 600; flex: 1; }
+    .test-case-body { padding: 0 14px 10px; font-size: 0.7rem; color: var(--text-muted); line-height: 1.5; }
+    .raw-json { background: #0d1117; color: #4ade80; font-family: 'Courier New', monospace; font-size: 0.69rem; padding: 16px; border-radius: 8px; overflow-x: auto; white-space: pre; line-height: 1.55; }
+    .json-key { color: #79c0ff; } .json-str { color: #a5d6ff; } .json-num { color: #ffa657; } .json-bool { color: #ff7b72; } .json-null { color: var(--text-muted); }
+
+    /* loading */
+    .loading { display: flex; align-items: center; gap: 8px; padding: 20px; color: var(--text-muted); font-size: 0.8rem; }
+    .spin { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── SPLIT VIEW TABS ── */
+    .sv-tabs { display: flex; border-bottom: 1px solid var(--panel-border); background: var(--header-bg); flex-shrink: 0; }
+    .sv-tab { padding: 8px 18px; font-size: 0.73rem; font-weight: 600; cursor: pointer; border: none; background: transparent; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .15s; white-space: nowrap; }
+    .sv-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .sv-tab:hover:not(.active) { color: var(--text-dim); }
+
+    /* ── PDF RIGHT PANE ── */
+    .pdf-pane { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+    .pdf-pane-hdr { display: flex; align-items: center; gap: 8px; padding: 9px 14px 7px; border-bottom: 1px solid var(--panel-border); background: rgba(255,255,255,0.01); flex-shrink: 0; }
+    .pdf-pane-title { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--text-muted); }
+    .pdf-pane-name { font-size: 0.68rem; color: var(--text-dim); font-family: monospace; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pdf-pane-hint { font-size: 0.6rem; color: var(--text-muted); font-style: italic; margin-left: auto; white-space: nowrap; flex-shrink: 0; }
+    .pdf-frame-wrap { flex: 1; overflow: hidden; background: #2a2a2a; display: flex; flex-direction: column; min-height: 0; }
+    .pdf-frame { flex: 1; border: none; width: 100%; height: 100%; }
+    .pdf-no-doc { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); gap: 8px; font-size: 0.78rem; }
+    .pdf-no-doc-icon { font-size: 2rem; opacity: 0.25; }
+
+    /* ── EXTRACTION REQUEST (tab 2) ── */
+    .req-cat-bar { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 10px; border-bottom: 1px solid var(--panel-border); flex-shrink: 0; background: rgba(255,255,255,0.01); }
+    .req-cat-pill { font-size: 0.63rem; font-weight: 600; padding: 3px 10px; border-radius: 9999px; cursor: pointer; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: var(--text-muted); transition: all .15s; white-space: nowrap; }
+    .req-cat-pill.active { border-color: var(--accent); background: rgba(77,159,255,0.12); color: var(--accent); }
+    .req-cat-pill:hover:not(.active) { border-color: rgba(255,255,255,0.16); color: var(--text-dim); }
+
+    /* ── EXTRACTION SCORECARD ── */
+    .ec-wrap { padding: 10px 18px 12px; border-bottom: 1px solid var(--panel-border); background: rgba(0,0,0,0.18); overflow-y: auto; max-height: 260px; flex-shrink: 0; }
+    .ec-wrap::-webkit-scrollbar { width: 4px; } .ec-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+    .ec-obj { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+    .ec-obj-label { font-size: 0.57rem; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+    .ec-obj-text { font-size: 0.7rem; color: var(--text-dim); line-height: 1.4; }
+    .ec-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+    .ec-group { flex: 1; min-width: 0; }
+    .ec-group-title { font-size: 0.57rem; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--text-muted); margin-bottom: 5px; display: flex; align-items: center; gap: 6px; }
+    .ec-group-title::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.06); }
+    .ec-cats { display: flex; flex-wrap: wrap; gap: 4px; }
+    .ec-cat { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 5px; font-size: 0.63rem; font-weight: 600; border: 1px solid; cursor: default; }
+    .ec-cat.pass { background: rgba(34,197,94,0.07); border-color: rgba(34,197,94,0.22); color: #4ade80; }
+    .ec-cat.fail { background: rgba(239,68,68,0.06); border-color: rgba(239,68,68,0.16); color: #f87171; }
+    .ec-cat-icon { font-size: 0.58rem; }
+    .ec-cat-badge { font-size: 0.57rem; font-weight: 400; padding: 1px 5px; border-radius: 8px; margin-left: 2px; }
+    .ec-cat.pass .ec-cat-badge { background: rgba(34,197,94,0.12); color: #86efac; }
+    .ec-cat.fail .ec-cat-badge { background: rgba(255,255,255,0.04); color: #555; }
+    .ec-bottom { display: flex; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+    .ec-conf { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+    .ec-conf-label { font-size: 0.58rem; color: var(--text-muted); white-space: nowrap; }
+    .ec-conf-track { width: 80px; height: 5px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+    .ec-conf-fill { height: 100%; border-radius: 3px; transition: width .4s; }
+    .ec-conf-pct { font-size: 0.68rem; font-weight: 700; }
+    .ec-reasons { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+    .ec-reason { font-size: 0.64rem; color: var(--text-muted); display: flex; align-items: flex-start; gap: 6px; line-height: 1.4; }
+    .ec-reason-score { font-size: 0.58rem; font-weight: 700; padding: 1px 5px; border-radius: 8px; flex-shrink: 0; margin-top: 1px; white-space: nowrap; }
+    .ec-reason-text { flex: 1; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .ec-toggle { font-size: 0.6rem; color: var(--text-muted); background: none; border: none; cursor: pointer; padding: 0; margin-left: auto; white-space: nowrap; flex-shrink: 0; }
+    .ec-toggle:hover { color: var(--text-dim); }
+
+    /* ── KEY-VALUE TABLE RENDERER ── */
+    .kv-table { width: 100%; border-collapse: collapse; font-size: 0.67rem; margin-top: 4px; }
+    .kv-table th { text-align: left; padding: 3px 10px; font-size: 0.58rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.05); font-weight: 600; white-space: nowrap; width: 1%; min-width: 90px; vertical-align: top; }
+    .kv-table td { padding: 3px 10px; border: 1px solid rgba(255,255,255,0.05); color: var(--text-dim); vertical-align: top; line-height: 1.45; word-break: break-word; }
+    .kv-table .bool-yes { color: #4ade80; font-weight: 600; }
+    .kv-table .bool-no  { color: #f87171; font-weight: 600; }
+    .kv-arr-sep { border: none; border-top: 1px dashed rgba(255,255,255,0.07); margin: 4px 0; }
+    .kv-list-item { font-size: 0.6rem; padding: 1px 6px; border-radius: 6px; background: rgba(255,255,255,0.04); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.07); display: inline-block; margin: 1px; }
+    .kv-section-hdr { font-size: 0.59rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin: 8px 0 3px; padding-bottom: 3px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .theme-toggle-btn { background: transparent; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; padding: 4px 8px; line-height: 1; transition: background .15s; }
+    .theme-toggle-btn:hover { background: rgba(128,128,128,0.1); }
+</style>
+<style>
+    /* ── LIGHT MODE ── */
+    html.light { color-scheme: light; --bg: #f1f2f4; --panel-bg: #f7f7f9; --panel-border: rgba(0,0,0,0.09); --header-bg: #eaeaee; --text: #18181b; --text-dim: #4a4c54; --text-muted: #8a8c9a; --accent: #2563eb; --node-bg: #ffffff; --node-border: rgba(0,0,0,0.09); }
+    html.light .raw-json { background: #f0f4f8; color: #1e293b; }
+    html.light .json-key { color: #1d4ed8; } html.light .json-str { color: #15803d; } html.light .json-num { color: #b45309; } html.light .json-bool { color: #dc2626; } html.light .json-null { color: #6b7280; }
+    html.light .consol-schema { background: #f0f4f8; color: #1e293b; }
+    html.light .cat-card { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.07); }
+    html.light .cat-hdr { background: rgba(0,0,0,0.03); }
+    html.light .cat-hdr:hover { background: rgba(0,0,0,0.06); }
+    html.light .cat-item { background: rgba(0,0,0,0.02); border-color: rgba(0,0,0,0.06); }
+    html.light .cat-item:hover { background: rgba(0,0,0,0.04); }
+    html.light .src-sec { background: #fafafa; border-color: rgba(0,0,0,0.09); }
+    html.light .siop-val code { background: rgba(0,0,0,0.06); color: #15803d; }
+    html.light .kv-table th { background: rgba(0,0,0,0.04); color: #6b7280; border-color: rgba(0,0,0,0.08); }
+    html.light .kv-table td { color: #374151; border-color: rgba(0,0,0,0.06); }
+    html.light .kv-list-item { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.08); color: var(--text-muted); }
+    html.light .split-topbar { background: #f7f7f9; }
+    html.light .tg-run-hdr { background: rgba(0,0,0,0.04); }
+    html.light .tg-run-hdr:hover { background: rgba(0,0,0,0.07); }
+    html.light .ec-wrap { background: rgba(0,0,0,0.02); }
+    html.light ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); }
+</style>
+</head>
+<body>
+
+<div class="hdr">
+    <a href="index.html" class="hdr-back">&#8592; Workflow</a>
+    <div class="hdr-title">Document Extractions</div>
+    <div class="hdr-spacer"></div>
+    <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle light/dark mode"></button>
+    <span class="hdr-count" id="fileCount">Loading...</span>
+</div>
+
+<div class="body">
+    <!-- FILE TREE -->
+    <div class="tree-panel">
+        <div class="tree-hdr">
+            <div class="tree-hdr-title">Output Files</div>
+            <input class="tree-search" type="text" placeholder="Filter..." oninput="filterTree(this.value)">
+        </div>
+        <div class="tree-scroll" id="treeScroll">
+            <div class="loading"><div class="spin"></div>Loading...</div>
+        </div>
+    </div>
+
+    <!-- CONTENT PANEL -->
+    <div class="content-panel" id="contentPanel">
+        <div class="content-empty" id="contentEmpty">
+            <div class="content-empty-icon">&#128202;</div>
+            <div class="content-empty-txt">Select a file to view its contents</div>
+        </div>
+        <!-- Split view (extraction files) -->
+        <div class="split-wrap" id="splitWrap" style="display:none;">
+            <div class="split-topbar" id="splitTopbar"></div>
+            <!-- Extraction scorecard (per-doc) -->
+            <div id="extractionScorecard" style="display:none;"></div>
+            <!-- Tab bar -->
+            <div class="sv-tabs" id="svTabs">
+                <button class="sv-tab active" onclick="switchSvTab('full')">Full Extraction</button>
+                <button class="sv-tab" onclick="switchSvTab('request')">Extraction Request</button>
+            </div>
+            <div class="split-cols">
+                <!-- Left pane: content changes per tab -->
+                <div class="split-left" id="splitLeft">
+                    <div class="split-pane-hdr" id="leftPaneHdr">
+                        <span class="split-pane-title" id="leftPaneTitle">Extracted Data</span>
+                        <span class="split-pane-count" id="leftCount"></span>
+                        <span class="split-pane-hint" id="leftPaneHint">Click an item to jump to page</span>
+                    </div>
+                    <!-- Category filter bar (tab 2 only) -->
+                    <div class="req-cat-bar" id="reqCatBar" style="display:none;"></div>
+                    <div class="split-pane-body" id="leftPane"></div>
+                </div>
+                <!-- Right pane: PDF viewer -->
+                <div class="pdf-pane" id="pdfPane">
+                    <div class="pdf-pane-hdr">
+                        <span class="pdf-pane-title">Source PDF</span>
+                        <span class="pdf-pane-name" id="pdfPaneName"></span>
+                        <span class="pdf-pane-hint" id="pdfPaneHint">Click an item to jump to page</span>
+                    </div>
+                    <div class="pdf-frame-wrap" id="pdfFrameWrap">
+                        <div class="pdf-no-doc" id="pdfNoDoc">
+                            <div class="pdf-no-doc-icon">📄</div>
+                            <div>Select a document to preview</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Scroll view (other files) -->
+        <div class="content-scroll" id="contentScroll" style="display:none;"></div>
+    </div>
+</div>
+
+<script>
+const API = '/api/orchestrator';
+let allFiles = [];
+let selectedFile = null;
+let sectionRegistry = {};
+let activeItemEl = null;
+// Split view tab state
+let currentSvTab  = 'full';
+let currentReqCat = null;       // selected category in Extraction Request tab
+let currentDocsFolderByDoc = []; // [docIdx] → documents_folder string
+
+// ═══════════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════════
+async function boot() {
+    try {
+        const res  = await fetch(`${API}/output_files`);
+        const data = await res.json();
+        allFiles   = data.files || [];
+        document.getElementById('fileCount').textContent = `${allFiles.length} files`;
+        renderTree(allFiles);
+    } catch(e) {
+        document.getElementById('treeScroll').innerHTML =
+            `<div style="padding:16px;color:#ef4444;font-size:0.75rem;">Failed to load: ${e.message}</div>`;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FILE TREE
+// ═══════════════════════════════════════════════════════════
+function fileTypeInfo(name) {
+    if (name.startsWith('ExtractionReport_')) return { icon: '📊', order: 0 };
+    if (name.startsWith('Extraction_'))        return { icon: '📄', order: 1 };
+    if (name.startsWith('DocumentReview_'))    return { icon: '🔍', order: 2 };
+    if (name.startsWith('ProcessingPlan_'))    return { icon: '📋', order: 3 };
+    if (name.startsWith('TestReport_'))        return { icon: '🔬', order: 4 };
+    return { icon: '📁', order: 9 };
+}
+function parseTimestamp(name) {
+    const m = name.match(/(\d{8})_(\d{6})/);
+    if (!m) return null;
+    const d = m[1], t = m[2];
+    return { date: `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`, time: `${t.slice(0,2)}:${t.slice(2,4)}:${t.slice(4,6)}`, raw: m[0] };
+}
+function fmtSize(b) {
+    if (b < 1024) return b + 'B';
+    if (b < 1048576) return (b/1024).toFixed(1) + 'KB';
+    return (b/1048576).toFixed(2) + 'MB';
+}
+function shortName(name) {
+    let n = name.replace(/\.json$/,'').replace(/_\d{8}_\d{6}$/,'')
+        .replace(/^ExtractionReport$/,'Extraction Report')
+        .replace(/^DocumentReview$/,'Document Review')
+        .replace(/^ProcessingPlan$/,'Processing Plan')
+        .replace(/^Extraction_/,'').replace(/^TestReport_/,'')
+        .replace(/_pdf$/,'').replace(/_/g,' ').trim();
+    return n.length > 30 ? n.slice(0,28) + '…' : n || name;
+}
+function esc(s) { return s.replace(/[^a-zA-Z0-9]/g,'_'); }
+
+function renderTree(files) {
+    const scroll = document.getElementById('treeScroll');
+    const groups = {};
+    for (const f of files) {
+        const ts   = parseTimestamp(f.filename);
+        const date = ts ? ts.date : 'Unknown';
+        const key  = ts ? ts.raw  : 'other';
+        if (!groups[date]) groups[date] = {};
+        if (!groups[date][key]) groups[date][key] = [];
+        groups[date][key].push(f);
+    }
+    let html = '';
+    for (const date of Object.keys(groups).sort().reverse()) {
+        const dateId = 'dg-' + date.replace(/-/g,'');
+        html += `<div class="tg-date" onclick="toggleGrp('${dateId}')">${date}<span id="${dateId}-c" style="font-size:.58rem;margin-left:4px;">&#9660;</span></div><div id="${dateId}">`;
+        for (const key of Object.keys(groups[date]).sort().reverse()) {
+            const run = groups[date][key].slice().sort((a,b) => fileTypeInfo(a.filename).order - fileTypeInfo(b.filename).order);
+            const ts  = parseTimestamp(run[0].filename);
+            if (run.length === 1) {
+                const f = run[0];
+                html += `<div class="tg-standalone"><div class="tfile" id="tf-${esc(f.filename)}" onclick="selectFile('${f.filename}')" title="${f.filename}">
+                    <span class="tfile-icon">${fileTypeInfo(f.filename).icon}</span>
+                    <span class="tfile-name">${shortName(f.filename)}</span>
+                    <span class="tfile-size">${fmtSize(f.size_bytes)}</span>
+                </div></div>`;
+            } else {
+                const rid = 'run-' + key;
+                html += `<div class="tg-run"><div class="tg-run-hdr" onclick="toggleGrp('${rid}')">
+                    <span style="font-size:.75rem;">📊</span>
+                    <span class="tg-run-time">${ts ? ts.time : key}</span>
+                    <span class="tg-run-badge">${run.length}</span>
+                    <span class="tg-run-chev open" id="${rid}-c">&#9658;</span>
+                </div><div class="tg-run-body" id="${rid}">`;
+                for (const f of run) {
+                    html += `<div class="tfile" id="tf-${esc(f.filename)}" onclick="selectFile('${f.filename}')" title="${f.filename}">
+                        <span class="tfile-icon">${fileTypeInfo(f.filename).icon}</span>
+                        <span class="tfile-name">${shortName(f.filename)}</span>
+                        <span class="tfile-size">${fmtSize(f.size_bytes)}</span>
+                    </div>`;
+                }
+                html += `</div></div>`;
+            }
+        }
+        html += `</div>`;
+    }
+    scroll.innerHTML = html || '<div style="padding:20px;color:var(--text-muted);font-size:.75rem;text-align:center;">No files found.</div>';
+}
+function toggleGrp(id) {
+    const el = document.getElementById(id);
+    const ch = document.getElementById(id + '-c');
+    if (!el) return;
+    const open = el.style.display !== 'none';
+    el.style.display = open ? 'none' : '';
+    if (ch) ch.style.transform = open ? 'rotate(-90deg)' : '';
+}
+function filterTree(q) {
+    const lq = q.toLowerCase();
+    document.querySelectorAll('.tfile').forEach(el => {
+        el.style.display = (!lq || (el.title||'').toLowerCase().includes(lq)) ? '' : 'none';
+    });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FILE SELECTION
+// ═══════════════════════════════════════════════════════════
+async function selectFile(filename) {
+    if (selectedFile) { const p = document.getElementById('tf-'+esc(selectedFile)); if (p) p.classList.remove('sel'); }
+    selectedFile = filename;
+    const cur = document.getElementById('tf-'+esc(filename)); if (cur) cur.classList.add('sel');
+
+    const empty  = document.getElementById('contentEmpty');
+    const split  = document.getElementById('splitWrap');
+    const scroll = document.getElementById('contentScroll');
+    empty.style.display  = 'none';
+    split.style.display  = 'none';
+    scroll.style.display = 'none';
+    document.getElementById('leftPane').innerHTML  = '<div class="loading"><div class="spin"></div>Loading...</div>';
+    document.getElementById('pdfFrameWrap').innerHTML = '<div class="pdf-no-doc"><div class="pdf-no-doc-icon">📄</div><div>Loading...</div></div>';
+    const sc = document.getElementById('extractionScorecard'); if (sc) sc.style.display = 'none';
+
+    const isSplit = filename.startsWith('ExtractionReport_') || filename.startsWith('Extraction_');
+    if (isSplit) {
+        split.style.display = 'flex';
+    } else {
+        scroll.style.display = 'block';
+        scroll.innerHTML = '<div class="loading"><div class="spin"></div>Loading...</div>';
+    }
+
+    try {
+        const res  = await fetch(`${API}/output_file/${encodeURIComponent(filename)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (isSplit) {
+            renderSplitView(filename, data);
+        } else {
+            scroll.innerHTML = renderFile(filename, data);
+        }
+    } catch(e) {
+        if (isSplit) document.getElementById('leftPane').innerHTML = `<div style="color:#ef4444;padding:16px;font-size:.8rem;">${e.message}</div>`;
+        else scroll.innerHTML = `<div style="color:#ef4444;padding:20px;font-size:.8rem;">${e.message}</div>`;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SPLIT VIEW — EXTRACTION FILES
+// ═══════════════════════════════════════════════════════════
+let currentExtractions = [];
+let currentDocIdx = 0;
+
+function renderSplitView(filename, data) {
+    sectionRegistry = {};
+    activeItemEl    = null;
+    currentSvTab    = 'full';
+    currentReqCat   = null;
+
+    // Normalise: single doc or report with multiple docs
+    const reportFolder = data.documents_folder || null;
+    if (filename.startsWith('ExtractionReport_')) {
+        currentExtractions = data.extractions || [];
+    } else {
+        // Single Extraction file — wrap in array
+        currentExtractions = [data];
+    }
+    // Derive per-doc folder: prefer documents_folder from report, else extract from filepath
+    currentDocsFolderByDoc = currentExtractions.map(ex => {
+        if (reportFolder) return reportFolder;
+        if (ex.filepath)  return ex.filepath.replace(/[^/\\]+$/, '').replace(/[/\\]+$/, '');
+        return '/documents';
+    });
+
+    // Top bar: stats + doc tabs
+    const ts     = parseTimestamp(filename);
+    const folder = data.documents_folder || (data.filepath ? data.filepath.replace(/[^/]+$/, '') : '—');
+    const totalSections   = currentExtractions.reduce((s,e) => s + (e.total_sections||0), 0);
+    const relevantSections = currentExtractions.reduce((s,e) => s + (e.relevant_sections||0), 0);
+
+    let topHtml = `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+        <div>
+            <div class="page-title">${filename.startsWith('ExtractionReport_') ? 'Extraction Report' : (currentExtractions[0].filename || filename)}</div>
+            <div class="page-sub">${filename}</div>
+        </div>
+        <div class="stat-bar" style="margin-top:0;flex-shrink:0;">
+            <div class="stat-item"><div class="stat-val">${currentExtractions.length}</div><div class="stat-lbl">Docs</div></div>
+            <div class="stat-sep"></div>
+            <div class="stat-item"><div class="stat-val">${totalSections}</div><div class="stat-lbl">Sections</div></div>
+            <div class="stat-sep"></div>
+            <div class="stat-item"><div class="stat-val" style="color:#22c55e;">${relevantSections}</div><div class="stat-lbl">Relevant</div></div>
+            ${ts ? `<div class="stat-sep"></div><div class="stat-item"><div class="stat-val" style="font-size:.8rem;">${ts.time}</div><div class="stat-lbl">${ts.date}</div></div>` : ''}
+        </div>
+    </div>`;
+
+    if (currentExtractions.length > 1) {
+        topHtml += `<div class="split-docbar" id="docTabs">`;
+        currentExtractions.forEach((ex, i) => {
+            topHtml += `<div class="split-doctab${i===0?' active':''}" onclick="switchDoc(${i})" id="doctab-${i}">${ex.filename || 'Doc '+(i+1)}</div>`;
+        });
+        topHtml += `</div>`;
+    }
+    document.getElementById('splitTopbar').innerHTML = topHtml;
+
+    currentDocIdx = 0;
+    renderDocPanes(0);
+}
+
+function switchDoc(idx) {
+    currentDocIdx = idx;
+    currentReqCat = null;
+    document.querySelectorAll('.split-doctab').forEach((el,i) => el.classList.toggle('active', i===idx));
+    clearFocus();
+    renderDocPanes(idx);
+}
+
+function switchSvTab(tab) {
+    currentSvTab  = tab;
+    currentReqCat = null;
+    document.querySelectorAll('.sv-tab').forEach(el => {
+        el.classList.toggle('active', el.textContent.trim() === (tab === 'full' ? 'Full Extraction' : 'Extraction Request'));
+    });
+    renderDocPanes(currentDocIdx);
+}
+
+// ─────────────────────────────────────────────────────────
+//  EXTRACTION SCORECARD
+// ─────────────────────────────────────────────────────────
+function updateExtractionScorecard(idx) {
+    const el = document.getElementById('extractionScorecard');
+    if (!el) return;
+    const ex = currentExtractions[idx];
+    if (!ex) { el.style.display = 'none'; return; }
+
+    const subStepEx = ex.sub_step_extractions || {};
+    const stepEx    = ex.step_extraction || {};
+    const objective = ex.process_step_name || 'Extract information from documents';
+
+    const SS_META = {
+        'sub-step-extract-hv':                    { label: 'HV',           color: '#7ab8ff', group: 'Supply Requirements' },
+        'sub-step-extract-lv':                    { label: 'LV',           color: '#5eead4', group: 'Supply Requirements' },
+        'sub-step-extract-sl':                    { label: 'SL',           color: '#fcd34d', group: 'Supply Requirements' },
+        'sub-step-extract-earthing':              { label: 'Earthing',     color: '#c084fc', group: 'Supply Requirements' },
+        'sub-step-extract-easements':             { label: 'Easements',    color: '#fb923c', group: 'Supply Requirements' },
+        'sub-step-extract-substation':            { label: 'Substation',   color: '#f472b6', group: 'Supply Requirements' },
+        'sub-step-extract-funding-determination': { label: 'Funding',      color: '#4ade80', group: 'Funding Requirements' },
+        'sub-step-extract-funding-ancillary-fees':{ label: 'Ancillary',    color: '#fbbf24', group: 'Funding Requirements' },
+    };
+
+    // Build cats from sub_step_extractions (new format) or fall back to step_extraction (legacy)
+    const cats = [];
+    if (Object.keys(subStepEx).length > 0) {
+        for (const [ssId, innerData] of Object.entries(subStepEx)) {
+            const meta = SS_META[ssId] || { label: ssId, color: '#94a3b8', group: 'Other' };
+            let count = 0;
+            if (innerData && typeof innerData === 'object') {
+                for (const v of Object.values(innerData)) { if (Array.isArray(v)) count += v.length; }
+            }
+            cats.push({ ...meta, ssId, count, pass: count > 0 });
+        }
+    } else {
+        // Legacy: hv/lv/sl/earthing/easements/substation flat or nested under supply_requirements
+        const supReqs = stepEx.supply_requirements || {};
+        const isNested = !!stepEx.supply_requirements;
+        for (const [k, meta] of Object.entries({
+            hv:{ label:'HV', color:'#7ab8ff', group:'Supply Requirements' },
+            lv:{ label:'LV', color:'#5eead4', group:'Supply Requirements' },
+            sl:{ label:'SL', color:'#fcd34d', group:'Supply Requirements' },
+            earthing:{ label:'Earthing', color:'#c084fc', group:'Supply Requirements' },
+            easements:{ label:'Easements', color:'#fb923c', group:'Supply Requirements' },
+            substation:{ label:'Substation', color:'#f472b6', group:'Supply Requirements' },
+        })) {
+            const raw = isNested ? (supReqs[k] || []) : (stepEx[k] || []);
+            const count = Array.isArray(raw) ? raw.length : 0;
+            cats.push({ ...meta, ssId: k, count, pass: count > 0 });
+        }
+        const frItems = stepEx.funding_requirements?.items || stepEx.funding_items || [];
+        cats.push({ label:'Funding', color:'#4ade80', group:'Funding Requirements', ssId:'funding', count: frItems.length, pass: frItems.length > 0 });
+    }
+
+    const totalCats = cats.length;
+    const passCats  = cats.filter(c => c.pass).length;
+    const failCats  = totalCats - passCats;
+    const scSum     = failCats === 0 ? '#22c55e' : passCats === 0 ? '#ef4444' : '#f59e0b';
+
+    // Group by category group
+    const groups = {};
+    for (const cat of cats) {
+        if (!groups[cat.group]) groups[cat.group] = [];
+        groups[cat.group].push(cat);
+    }
+
+    // ── Build HTML ──
+    let html = `<div class="ec-wrap">`;
+    html += `<div class="ec-obj">
+        <span class="ec-obj-label">Objective</span>
+        <span class="ec-obj-text">${escHtml(objective)}</span>
+        <button class="ec-toggle" onclick="toggleScorecard(this)">▲ Hide</button>
+    </div>`;
+
+    html += `<div style="font-size:.63rem;color:${scSum};font-weight:600;margin-bottom:8px;">
+        ${passCats}/${totalCats} categories extracted
+        ${failCats > 0 ? `<span style="color:#f87171;font-weight:400;margin-left:8px;">✗ Missing: ${cats.filter(c=>!c.pass).map(c=>c.label).join(', ')}</span>` : ''}
+    </div>`;
+
+    html += `<div class="ec-row">`;
+    for (const [groupName, groupCats] of Object.entries(groups)) {
+        html += `<div class="ec-group"><div class="ec-group-title">${escHtml(groupName)}</div><div class="ec-cats">`;
+        for (const cat of groupCats) {
+            html += `<div class="ec-cat ${cat.pass ? 'pass' : 'fail'}" title="${cat.pass ? `${cat.count} item(s) extracted` : 'Not found in this document'}">
+                <span class="ec-cat-icon">${cat.pass ? '✓' : '✗'}</span>
+                <span>${escHtml(cat.label)}</span>
+                <span class="ec-cat-badge">${cat.pass ? cat.count + (cat.count !== 1 ? ' items' : ' item') : 'Not found'}</span>
+            </div>`;
+        }
+        html += `</div></div>`;
+    }
+    html += `</div></div>`;
+    el.innerHTML = html;
+    el.style.display = '';
+}
+
+function toggleScorecard(btn) {
+    const el = document.getElementById('extractionScorecard');
+    if (!el) return;
+    const wrap = el.querySelector('.ec-wrap > *:not(.ec-obj)');
+    // Toggle everything except the objective row
+    const items = el.querySelectorAll('.ec-wrap > *:not(.ec-obj)');
+    const hidden = items[0] && items[0].style.display === 'none';
+    items.forEach(el => el.style.display = hidden ? '' : 'none');
+    btn.textContent = hidden ? '▲ Hide' : '▼ Show';
+    el.style.maxHeight = hidden ? '' : '';
+}
+
+function renderDocPanes(idx) {
+    const ex = currentExtractions[idx];
+    if (!ex) return;
+    sectionRegistry = {};
+
+    // ── Extraction scorecard ─────────────────────────────────────
+    updateExtractionScorecard(idx);
+
+    // ── PDF RIGHT PANE ──────────────────────────────────────────
+    const folder   = currentDocsFolderByDoc[idx] || '/documents';
+    const pdfName  = ex.filename || '';
+    // Use ex.filepath directly when available (already has the full path incl. subdirectory)
+    const rawPdfPath = ex.filepath || (folder + '/' + pdfName);
+    const pdfUrl   = pdfName
+        ? `${API}/serve_document/${rawPdfPath.replace(/^\/+/,'').split('/').map(encodeURIComponent).join('/')}`
+        : null;
+
+    const pdfWrap = document.getElementById('pdfFrameWrap');
+    document.getElementById('pdfPaneName').textContent = pdfName || '—';
+    if (pdfUrl) {
+        pdfWrap.innerHTML = `<iframe class="pdf-frame" id="pdfFrame" src="${escAttr(pdfUrl)}" title="Source PDF"></iframe>`;
+        document.getElementById('pdfPaneHint').textContent = 'Click an item to jump to page';
+    } else {
+        pdfWrap.innerHTML = `<div class="pdf-no-doc"><div class="pdf-no-doc-icon">📄</div><div>No PDF available for this entry</div></div>`;
+        document.getElementById('pdfPaneHint').textContent = '';
+    }
+
+    // ── LEFT PANE: driven by active tab ────────────────────────
+    const catBar  = document.getElementById('reqCatBar');
+    const hint    = document.getElementById('leftPaneHint');
+    const title   = document.getElementById('leftPaneTitle');
+    const counter = document.getElementById('leftCount');
+    // Support both sub_step_extractions (new) and step_extraction (legacy)
+    const stepEx  = ex.sub_step_extractions || ex.step_extraction;
+
+    if (currentSvTab === 'full') {
+        catBar.style.display = 'none';
+        title.textContent    = 'Extracted Data';
+        hint.textContent     = 'Click an item to jump to page';
+        document.getElementById('leftPane').innerHTML = renderStepExtractionSplit(stepEx, idx);
+        counter.textContent = document.querySelectorAll('#leftPane .cat-item').length + ' items';
+
+    } else {
+        // ── Extraction Request tab ── (filter by sub-step / category)
+        title.textContent = 'Extraction Request';
+        hint.textContent  = 'Select a category to filter';
+        catBar.style.display = 'flex';
+
+        const SS_LABELS = {
+            'sub-step-extract-hv': 'High Voltage (HV)',
+            'sub-step-extract-lv': 'Low Voltage (LV)',
+            'sub-step-extract-sl': 'Street Lighting (SL)',
+            'sub-step-extract-earthing': 'Earthing',
+            'sub-step-extract-easements': 'Easements',
+            'sub-step-extract-substation': 'Substation',
+            'sub-step-extract-funding-determination': 'Funding Determination',
+            'sub-step-extract-funding-ancillary-fees': 'Ancillary Fees',
+        };
+
+        // Build category list
+        const cats = stepEx && typeof stepEx === 'object'
+            ? Object.keys(stepEx).filter(k => {
+                  const v = stepEx[k];
+                  return Array.isArray(v) ? v.length > 0 : (v && typeof v === 'object' && Object.keys(v).length > 0);
+              })
+            : [];
+
+        catBar.innerHTML = cats.length > 0
+            ? cats.map(cat => {
+                const label = SS_LABELS[cat] || cat.replace(/sub-step-extract-/,'').replace(/-/g,' ');
+                return `<span class="req-cat-pill${cat === currentReqCat ? ' active' : ''}" onclick="selectReqCat('${escAttr(cat)}',${idx})" data-key="${escAttr(cat)}">${escHtml(label)}</span>`;
+              }).join('')
+            : '<span style="font-size:.65rem;color:var(--text-muted);">No categories available</span>';
+
+        if (!currentReqCat && cats.length > 0) currentReqCat = cats[0];
+        document.getElementById('leftPane').innerHTML = renderReqCatItems(stepEx, currentReqCat, idx);
+        counter.textContent = document.querySelectorAll('#leftPane .cat-item').length + ' items';
+    }
+}
+
+function selectReqCat(cat, docIdx) {
+    currentReqCat = cat;
+    document.querySelectorAll('#reqCatBar .req-cat-pill').forEach(el => {
+        el.classList.toggle('active', el.getAttribute('data-key') === cat);
+    });
+    const ex = currentExtractions[docIdx] || {};
+    const stepEx = ex.sub_step_extractions || ex.step_extraction;
+    document.getElementById('leftPane').innerHTML = renderReqCatItems(stepEx, cat, docIdx);
+    document.getElementById('leftCount').textContent = document.querySelectorAll('#leftPane .cat-item').length + ' items';
+}
+
+function renderReqCatItems(stepEx, cat, docIdx) {
+    if (!stepEx || !cat) return '<div style="color:var(--text-muted);padding:16px;font-size:.75rem;">Select a category.</div>';
+    const val = stepEx[cat];
+    if (!val) return `<div style="color:var(--text-muted);padding:16px;font-size:.75rem;">No data for "${cat}".</div>`;
+
+    const catColors = {
+        'sub-step-extract-hv':'#7ab8ff', 'sub-step-extract-lv':'#5eead4',
+        'sub-step-extract-sl':'#fcd34d', 'sub-step-extract-earthing':'#c084fc',
+        'sub-step-extract-easements':'#fb923c', 'sub-step-extract-substation':'#f472b6',
+        'sub-step-extract-funding-determination':'#4ade80', 'sub-step-extract-funding-ancillary-fees':'#fbbf24',
+        hv:'#7ab8ff', lv:'#5eead4', sl:'#fcd34d', earthing:'#c084fc',
+        easements:'#fb923c', substation:'#f472b6', funding:'#4ade80',
+    };
+    const color = catColors[cat] || catColors[cat.toLowerCase()] || '#94a3b8';
+
+    // For sub_step_extractions format, val is an inner object {ArrayKey: [...], ...}
+    // Flatten all arrays out of it
+    let items = [];
+    let totalAmount = null;
+    if (Array.isArray(val)) {
+        items = val;
+    } else if (val && typeof val === 'object') {
+        for (const [k, v] of Object.entries(val)) {
+            if (Array.isArray(v)) items.push(...v);
+            else if (k === 'total_amount_payable') totalAmount = v;
+        }
+        // no fallback — empty inner object means nothing extracted
+    }
+
+    if (items.length === 0 && totalAmount == null) return `<div style="color:var(--text-muted);padding:16px;font-size:.75rem;">No items extracted for this sub-step in this document.</div>`;
+
+    let html = `<div class="cat-grid" style="padding:6px 8px;">`;
+    for (const item of items) {
+        if (typeof item === 'string') {
+            html += `<div class="cat-item" onclick="jumpToPdfPage(this,0,${docIdx})"><div class="cat-item-raw">${escHtml(item)}</div></div>`;
+        } else {
+            const desc    = item.description || item.item_description || item.requirement || item.text || '';
+            const srcSec  = item.source_section || '';
+            const srcPage = item.source_page || 0;
+            const meta    = [];
+            const SHOWN   = ['source_section','source_page','funding_category','responsible_party','amount_or_formula','source_document'];
+            if (srcPage || srcSec) meta.push({ label: `p.${srcPage||'?'}${srcSec?' § '+srcSec:''}`, link: true });
+            if (item.funding_category)  meta.push({ label: item.funding_category });
+            if (item.responsible_party) meta.push({ label: item.responsible_party });
+            if (item.amount_or_formula) meta.push({ label: item.amount_or_formula });
+            if (item.amount != null)    meta.push({ label: typeof item.amount === 'number' ? '$'+item.amount.toFixed(2) : String(item.amount) });
+            if (item.source_document)   meta.push({ label: item.source_document });
+            html += `<div class="cat-item" style="border-left:2px solid ${color}20;" onclick="jumpToPdfPage(this,${srcPage},${docIdx})">
+                ${desc ? `<div class="cat-item-desc">${escHtml(desc)}</div>` : ''}
+                ${renderItemKV(item, [...SHOWN, 'description', 'item_description'])}
+                ${meta.length ? `<div class="cat-item-meta">${meta.map(m=>`<span class="cat-meta-pill${m.link?' src-link':''}">${escHtml(m.label)}</span>`).join('')}</div>` : ''}
+            </div>`;
+        }
+    }
+    if (totalAmount != null) {
+        html += `<div style="padding:6px 8px;font-size:.7rem;font-weight:700;color:#fbbf24;border-top:1px solid rgba(255,255,255,0.07);margin-top:4px;">
+            Total Amount Payable: $${typeof totalAmount === 'number' ? totalAmount.toFixed(2) : escHtml(String(totalAmount))}
+        </div>`;
+    }
+    return html + '</div>';
+}
+
+function jumpToPdfPage(itemEl, page, docIdx) {
+    if (activeItemEl) activeItemEl.classList.remove('active');
+    activeItemEl = itemEl;
+    itemEl.classList.add('active');
+
+    if (!page || page < 1) return;
+    const folder  = currentDocsFolderByDoc[docIdx] || '/documents';
+    const ex      = currentExtractions[docIdx] || {};
+    const pdfName = ex.filename || '';
+    if (!pdfName) return;
+    const rawPath = ex.filepath || (folder + '/' + pdfName);
+    const baseUrl = `${API}/serve_document/${rawPath.replace(/^\/+/,'').split('/').map(encodeURIComponent).join('/')}`;
+    const frame   = document.getElementById('pdfFrame');
+    if (frame) {
+        frame.src = `${baseUrl}#page=${page}`;
+        document.getElementById('pdfPaneHint').textContent = `Page ${page}`;
+    }
+}
+
+function renderSrcTables(tables) {
+    let html = '';
+    for (const tbl of tables) {
+        if (!tbl || !tbl.headers) continue;
+        html += `<div class="src-sec-table"><table class="src-table"><thead><tr>`;
+        for (const h of tbl.headers) html += `<th>${escHtml(h)}</th>`;
+        html += `</tr></thead><tbody>`;
+        for (const row of (tbl.rows||[])) {
+            html += `<tr>${row.map(c=>`<td>${escHtml(c)}</td>`).join('')}</tr>`;
+        }
+        html += `</tbody></table></div>`;
+    }
+    return html;
+}
+
+const SS_META_FULL = {
+    'sub-step-extract-hv':                    { label: 'High Voltage (HV)',         color: '#7ab8ff', group: 'Step 3 — Supply Requirements' },
+    'sub-step-extract-lv':                    { label: 'Low Voltage (LV)',           color: '#5eead4', group: 'Step 3 — Supply Requirements' },
+    'sub-step-extract-sl':                    { label: 'Street Lighting (SL)',        color: '#fcd34d', group: 'Step 3 — Supply Requirements' },
+    'sub-step-extract-earthing':              { label: 'Earthing',                   color: '#c084fc', group: 'Step 3 — Supply Requirements' },
+    'sub-step-extract-easements':             { label: 'Easements',                  color: '#fb923c', group: 'Step 3 — Supply Requirements' },
+    'sub-step-extract-substation':            { label: 'Substation',                 color: '#f472b6', group: 'Step 3 — Supply Requirements' },
+    'sub-step-extract-funding-determination': { label: 'Funding Determination',      color: '#4ade80', group: 'Step 4 — Funding Requirements' },
+    'sub-step-extract-funding-ancillary-fees':{ label: 'Ancillary Network Fees',     color: '#fbbf24', group: 'Step 4 — Funding Requirements' },
+};
+
+function renderStepExtractionSplit(data, docIdx) {
+    if (!data || typeof data !== 'object') return '<div style="color:var(--text-muted);padding:16px;font-size:.75rem;">No structured extraction data.</div>';
+    if (data.note)  return `<div style="color:var(--text-muted);padding:16px;font-size:.75rem;">${data.note}</div>`;
+    if (data.error) return `<div style="color:#ef4444;padding:16px;font-size:.75rem;">Error: ${data.error}</div>`;
+
+    const isSubStepFormat = Object.keys(data).some(k => k.startsWith('sub-step-'));
+
+    if (isSubStepFormat) {
+        return renderSubStepExtractionsView(data, docIdx);
+    }
+
+    // ── Legacy flat/nested step_extraction format ──
+    const catColors = {
+        hv:'#7ab8ff', lv:'#5eead4', sl:'#fcd34d', earthing:'#c084fc',
+        easements:'#fb923c', substation:'#f472b6', funding:'#4ade80',
+        funding_items:'#4ade80', scope:'#94a3b8', requirements:'#94a3b8', cost:'#fcd34d'
+    };
+    let html = '<div class="cat-grid">';
+    for (const [key, val] of Object.entries(data)) {
+        if (key === 'note' || key === 'error') continue;
+        const color = catColors[key.toLowerCase()] || '#94a3b8';
+        const items = Array.isArray(val) ? val : (val && typeof val === 'object' && !Array.isArray(val) ? null : null);
+        const objItems = Array.isArray(val) ? val : null;
+        if (objItems && objItems.length > 0) {
+            const cbId = 'cb-' + Math.random().toString(36).slice(2,8);
+            html += `<div class="cat-card"><div class="cat-hdr" onclick="toggleCat('${cbId}')">
+                <span class="cat-dot" style="background:${color};"></span>
+                <span class="cat-name" style="color:${color};">${escHtml(key)}</span>
+                <span class="cat-count">${objItems.length}</span>
+                <span class="cat-chev open" id="${cbId}-c">&#9658;</span>
+            </div><div class="cat-body" id="${cbId}">`;
+            html += renderItemsList(objItems, color, docIdx);
+            html += `</div></div>`;
+        } else if (val && typeof val === 'object' && !Array.isArray(val)) {
+            const cbId = 'cb-' + Math.random().toString(36).slice(2,8);
+            const entries = Object.entries(val);
+            if (entries.length) {
+                html += `<div class="cat-card"><div class="cat-hdr" onclick="toggleCat('${cbId}')">
+                    <span class="cat-dot" style="background:${color};"></span>
+                    <span class="cat-name" style="color:${color};">${escHtml(key)}</span>
+                    <span class="cat-count">${entries.length} keys</span>
+                    <span class="cat-chev open" id="${cbId}-c">&#9658;</span>
+                </div><div class="cat-body" id="${cbId}">${renderNestedObj(val, color)}</div></div>`;
+            }
+        }
+    }
+    return html + '</div>';
+}
+
+function renderSubStepExtractionsView(subStepData, docIdx) {
+    // Group by parent step
+    const groups = {};
+    const GROUP_ORDER = ['Step 3 — Supply Requirements', 'Step 4 — Funding Requirements'];
+
+    for (const [ssId, innerData] of Object.entries(subStepData)) {
+        const meta = SS_META_FULL[ssId] || { label: ssId.replace(/sub-step-extract-/,'').replace(/-/g,' '), color: '#94a3b8', group: 'Other' };
+
+        // Flatten all arrays from inner object
+        let items = [];
+        let totalAmount = null;
+        if (innerData && typeof innerData === 'object') {
+            for (const [k, v] of Object.entries(innerData)) {
+                if (Array.isArray(v)) items.push(...v);
+                else if (k === 'total_amount_payable') totalAmount = v;
+            }
+        }
+
+        if (!groups[meta.group]) groups[meta.group] = [];
+        groups[meta.group].push({ ssId, meta, items, totalAmount });
+    }
+
+    const SHOWN = ['source_section','source_page','funding_category','responsible_party','amount_or_formula','source_document','description','item_description'];
+    let html = '<div class="cat-grid">';
+
+    const groupKeys = [...GROUP_ORDER.filter(g => groups[g]), ...Object.keys(groups).filter(g => !GROUP_ORDER.includes(g))];
+
+    for (const groupName of groupKeys) {
+        const subSteps = groups[groupName];
+
+        // Group section header
+        html += `<div style="font-size:.59rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);padding:10px 4px 3px;display:flex;align-items:center;gap:8px;">
+            ${escHtml(groupName)}<span style="flex:1;height:1px;background:rgba(255,255,255,0.07);display:inline-block;"></span>
+        </div>`;
+
+        for (const { ssId, meta, items, totalAmount } of subSteps) {
+            const cbId = 'cb-' + ssId;
+            const hasItems = items.length > 0;
+            const statusColor = hasItems ? '#22c55e' : '#ef4444';
+            const statusIcon  = hasItems ? '✓' : '✗';
+            const statusLabel = hasItems ? `${items.length} item${items.length !== 1 ? 's' : ''}` : 'Not found';
+
+            // Build validation reasoning
+            let reasoning = '';
+            if (hasItems) {
+                const srcSections = [...new Set(items.map(i => i.source_section).filter(Boolean))];
+                const srcPages    = [...new Set(items.map(i => i.source_page).filter(Boolean))];
+                reasoning = `${items.length} item${items.length !== 1 ? 's' : ''} extracted`;
+                if (srcSections.length) reasoning += ` from "${srcSections.slice(0,2).join('", "')}"`;
+                if (srcPages.length)    reasoning += ` (page${srcPages.length > 1 ? 's' : ''} ${srcPages.slice(0,3).join(', ')})`;
+            } else {
+                reasoning = 'No items found in this document for this sub-step — category may not apply or was not present in source';
+            }
+            if (totalAmount != null) {
+                reasoning += ` — Total: $${typeof totalAmount === 'number' ? totalAmount.toFixed(2) : totalAmount}`;
+            }
+
+            html += `<div class="cat-card">
+                <div class="cat-hdr" onclick="toggleCat('${cbId}')">
+                    <span class="cat-dot" style="background:${meta.color};"></span>
+                    <span class="cat-name" style="color:${meta.color};">${escHtml(meta.label)}</span>
+                    <span style="margin-left:auto;display:flex;align-items:center;gap:5px;">
+                        <span style="font-size:.58rem;font-weight:700;padding:2px 8px;border-radius:9999px;background:${statusColor}15;color:${statusColor};border:1px solid ${statusColor}35;">${statusIcon} ${escHtml(statusLabel)}</span>
+                    </span>
+                    <span class="cat-chev open" id="${cbId}-c">&#9658;</span>
+                </div>
+                <div style="padding:3px 10px 5px;font-size:.62rem;color:var(--text-muted);font-style:italic;border-bottom:1px solid rgba(255,255,255,0.04);">${escHtml(reasoning)}</div>`;
+
+            if (hasItems) {
+                html += `<div class="cat-body" id="${cbId}">`;
+                html += renderItemsList(items, meta.color, docIdx);
+                if (totalAmount != null) {
+                    html += `<div style="padding:5px 9px;font-size:.7rem;font-weight:700;color:#fbbf24;border-top:1px solid rgba(255,255,255,0.06);">Total Amount Payable: $${typeof totalAmount === 'number' ? totalAmount.toFixed(2) : escHtml(String(totalAmount))}</div>`;
+                }
+                html += `</div>`;
+            } else {
+                html += `<div class="cat-body" id="${cbId}" style="display:none;"></div>`;
+            }
+            html += `</div>`;
+        }
+    }
+    return html + '</div>';
+}
+
+function renderItemsList(items, color, docIdx) {
+    const SHOWN = ['source_section','source_page','funding_category','responsible_party','amount_or_formula','source_document','description','item_description'];
+    let html = '';
+    for (const item of items) {
+        if (typeof item === 'string') {
+            html += `<div class="cat-item" onclick="jumpToPdfPage(this,0,${docIdx})"><div class="cat-item-raw">${escHtml(item)}</div></div>`;
+        } else {
+            const desc    = item.description || item.item_description || item.requirement || item.text || '';
+            const srcSec  = item.source_section || '';
+            const srcPage = item.source_page || 0;
+            const meta    = [];
+            if (srcPage || srcSec) meta.push({ label: `p.${srcPage||'?'}${srcSec?' § '+srcSec:''}`, link: true });
+            if (item.funding_category)  meta.push({ label: item.funding_category });
+            if (item.responsible_party) meta.push({ label: item.responsible_party });
+            if (item.amount_or_formula) meta.push({ label: item.amount_or_formula });
+            if (item.amount != null)    meta.push({ label: typeof item.amount === 'number' ? '$'+item.amount.toFixed(2) : String(item.amount) });
+            if (item.date)              meta.push({ label: item.date });
+            if (item.source_document)   meta.push({ label: item.source_document });
+            html += `<div class="cat-item" style="border-left:2px solid ${color}30;" onclick="jumpToPdfPage(this,${srcPage},${docIdx})">
+                ${desc ? `<div class="cat-item-desc">${escHtml(desc)}</div>` : ''}
+                ${renderItemKV(item, SHOWN)}
+                ${meta.length ? `<div class="cat-item-meta">${meta.map(m=>`<span class="cat-meta-pill${m.link?' src-link':''}">${escHtml(m.label)}</span>`).join('')}</div>` : ''}
+            </div>`;
+        }
+    }
+    return html;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SECTION FOCUS / LINKING
+// ═══════════════════════════════════════════════════════════
+function focusSection(itemEl, sectionName, page, docIdx) {
+    // Deactivate previous active item
+    if (activeItemEl) activeItemEl.classList.remove('active');
+    activeItemEl = itemEl;
+    itemEl.classList.add('active');
+
+    // Dim all sections first
+    const allSecs = document.querySelectorAll('#rightPane .src-sec');
+    allSecs.forEach(el => { el.classList.remove('highlighted'); el.classList.add('dimmed'); });
+
+    const norm     = normStr(sectionName);
+    const byName   = sectionRegistry[norm] || [];
+    const byPage   = [];
+    // Also try matching by page number if name lookup fails
+    if (byName.length === 0 && page > 0) {
+        allSecs.forEach(el => { if (parseInt(el.dataset.page||0) === parseInt(page)) byPage.push(el.id); });
+    }
+
+    const targets = byName.length > 0 ? byName : byPage;
+
+    if (targets.length > 0) {
+        const el = document.getElementById(targets[0]);
+        if (el) {
+            el.classList.remove('dimmed');
+            el.classList.add('highlighted');
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        document.getElementById('rightHint').textContent =
+            byName.length > 0 ? `Showing: ${sectionName || 'section'}` : `Showing: page ${page}`;
+    } else {
+        // No match — undim all
+        allSecs.forEach(el => el.classList.remove('dimmed'));
+        document.getElementById('rightHint').textContent = 'No matching section found';
+    }
+}
+
+function clearFocus() {
+    if (activeItemEl) { activeItemEl.classList.remove('active'); activeItemEl = null; }
+    document.querySelectorAll('#rightPane .src-sec').forEach(el => {
+        el.classList.remove('highlighted','dimmed');
+    });
+    const hint = document.getElementById('rightHint');
+    if (hint) hint.textContent = 'All sections shown';
+}
+
+function toggleCat(id) {
+    const el = document.getElementById(id);
+    const ch = document.getElementById(id+'-c');
+    if (!el) return;
+    const open = el.style.display !== 'none';
+    el.style.display = open ? 'none' : '';
+    if (ch) ch.classList.toggle('open', !open);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  NON-EXTRACTION RENDERERS
+// ═══════════════════════════════════════════════════════════
+function renderFile(filename, data) {
+    if (filename.startsWith('DocumentReview_'))  return renderDocumentReview(filename, data);
+    if (filename.startsWith('ProcessingPlan_'))  return renderProcessingPlan(filename, data);
+    if (filename.startsWith('TestReport_'))      return renderTestReport(filename, data);
+    return `<div class="raw-json">${syntaxHL(data)}</div>`;
+}
+
+function renderDocumentReview(filename, data) {
+    const docs  = data.documents || [];
+    const scans = data.scan_results || [];
+    let html = `<div class="page-title">Document Review</div>
+    <div class="page-sub">${filename}</div>
+    <div class="stat-bar" style="margin-top:10px;">
+        <div class="stat-item"><div class="stat-val">${data.total_files_scanned||scans.length}</div><div class="stat-lbl">Scanned</div></div>
+        <div class="stat-sep"></div>
+        <div class="stat-item"><div class="stat-val" style="color:#22c55e;">${data.matched_files||docs.length}</div><div class="stat-lbl">Matched</div></div>
+        <div class="stat-sep"></div>
+        <div class="stat-item"><div class="stat-val" style="color:#ef4444;">${(data.total_files_scanned||scans.length)-(data.matched_files||docs.length)}</div><div class="stat-lbl">Unmatched</div></div>
+    </div>`;
+    if (docs.length) {
+        html += `<div class="section-title">Matched Documents</div>`;
+        for (const doc of docs) {
+            const conf = doc.confidence||0, confPct = Math.round(conf*100);
+            const cc   = conf>=.8?'#22c55e':conf>=.5?'#f59e0b':'#ef4444';
+            html += `<div class="dr-doc-card">
+                <div class="dr-doc-icon">📄</div>
+                <div>
+                    <div class="dr-doc-filename">${escHtml(doc.filename)}</div>
+                    <div class="dr-doc-title">${escHtml(doc.document_title||'—')}</div>
+                    <div class="dr-meta-row">
+                        ${doc.document_type?`<span class="badge badge-blue">${escHtml(doc.document_type)}</span>`:''}
+                        ${doc.author?`<div class="dr-meta-item"><span class="dr-meta-lbl">Author</span><span class="dr-meta-val">${escHtml(doc.author)}</span></div>`:''}
+                        ${doc.date?`<div class="dr-meta-item"><span class="dr-meta-lbl">Date</span><span class="dr-meta-val">${doc.date}</span></div>`:''}
+                        ${doc.project_number?`<div class="dr-meta-item"><span class="dr-meta-lbl">Project</span><span class="dr-meta-val">${escHtml(doc.project_number)}</span></div>`:''}
+                        ${doc.revision?`<div class="dr-meta-item"><span class="dr-meta-lbl">Rev</span><span class="dr-meta-val">${escHtml(doc.revision)}</span></div>`:''}
+                        ${doc.text_quality?`<span class="badge ${doc.text_quality==='high'?'badge-green':'badge-amber'}">${doc.text_quality}</span>`:''}
+                    </div>
+                </div>
+                <div class="dr-conf">
+                    <div class="dr-conf-val" style="color:${cc};">${confPct}%</div>
+                    <div class="dr-conf-bar"><div class="dr-conf-fill" style="width:${confPct}%;background:${cc};"></div></div>
+                    <div style="font-size:.59rem;color:var(--text-muted);">Confidence</div>
+                </div>
+            </div>`;
+        }
+    }
+    if (scans.length) {
+        html += `<div class="section-title">All Files Scanned</div>
+        <table class="scan-table"><thead><tr><th>File</th><th>Type</th><th>Size</th><th>Quality</th><th>Match</th><th>Conf</th></tr></thead><tbody>`;
+        for (const s of scans) {
+            const conf = s.overall_confidence||0, confPct = Math.round(conf*100);
+            const cc   = conf>=.8?'#22c55e':conf>=.5?'#f59e0b':'#ef4444';
+            html += `<tr>
+                <td style="font-family:monospace;font-size:.67rem;">${escHtml(s.filename)}</td>
+                <td><span class="badge badge-gray">${escHtml(s.matched_document_type||'—')}</span></td>
+                <td style="color:var(--text-muted);">${fmtSize(s.file_size_bytes||0)}</td>
+                <td><span class="badge ${s.text_quality==='high'?'badge-green':'badge-amber'}">${s.text_quality||'—'}</span></td>
+                <td>${(s.filename_match||s.content_match)?'✅':'⬜'}</td>
+                <td style="color:${cc};">${confPct}%</td>
+            </tr>`;
+        }
+        html += `</tbody></table>`;
+    }
+    return html;
+}
+
+function renderProcessingPlan(filename, data) {
+    const plan = data.processing_plan || [];
+    let html = `<div class="page-title">Processing Plan</div><div class="page-sub">${filename}</div>
+    <div class="stat-bar" style="margin-top:10px;margin-bottom:16px;">
+        <div class="stat-item"><div class="stat-val">${data.total_documents||plan.length}</div><div class="stat-lbl">Documents</div></div>
+    </div>
+    <table class="plan-table"><thead><tr><th>File</th><th>Type</th><th>Tool</th><th>Content</th><th>Quality</th><th>Convert</th></tr></thead><tbody>`;
+    for (const p of plan) {
+        html += `<tr>
+            <td><div style="font-family:monospace;font-size:.69rem;">${escHtml(p.filename)}</div>${p.processing_notes?`<div class="plan-notes">${escHtml(p.processing_notes)}</div>`:''}</td>
+            <td><span class="badge badge-blue">${escHtml(p.document_type||'—')}</span></td>
+            <td style="font-family:monospace;font-size:.65rem;color:var(--text-muted);">${escHtml(p.processing_tool_id||'—')}</td>
+            <td><span class="badge badge-gray">${escHtml(p.content_type||'—')}</span></td>
+            <td><span class="badge ${p.text_quality==='high'?'badge-green':'badge-amber'}">${escHtml(p.text_quality||'—')}</span></td>
+            <td>${p.conversion_required?`<span class="badge badge-amber">${escHtml(p.conversion_type||'Yes')}</span>`:'<span style="color:var(--text-muted);font-size:.7rem;">No</span>'}</td>
+        </tr>`;
+    }
+    html += `</tbody></table>`;
+    return html;
+}
+
+function renderTestReport(filename, data) {
+    const tc    = data.test_cases || [];
+    const pass  = tc.filter(t => t.result==='PASS').length;
+    const score = data.overall_score ?? data.score;
+    const valid = data.is_valid;
+    let html = `<div class="page-title">Test Report</div><div class="page-sub">${filename}</div>
+    <div class="stat-bar" style="margin-top:10px;margin-bottom:16px;">
+        <div class="stat-item"><div class="stat-val" style="color:${valid?'#22c55e':'#ef4444'};">${valid?'Passed':'Failed'}</div><div class="stat-lbl">Result</div></div>
+        ${score!=null?`<div class="stat-sep"></div><div class="stat-item"><div class="stat-val" style="color:${score>=70?'#22c55e':score>=50?'#f59e0b':'#ef4444'};">${score}%</div><div class="stat-lbl">Score</div></div>`:''}
+        <div class="stat-sep"></div>
+        <div class="stat-item"><div class="stat-val">${pass}/${tc.length}</div><div class="stat-lbl">Tests Passed</div></div>
+        ${data.step_name?`<div class="stat-sep"></div><div class="stat-item"><div class="stat-val" style="font-size:.75rem;">${escHtml(data.step_name)}</div><div class="stat-lbl">Step</div></div>`:''}
+    </div>`;
+    if (data.summary) html += `<div class="section-title">Summary</div>
+        <div style="background:var(--panel-bg);border:1px solid var(--panel-border);border-radius:8px;padding:12px 16px;font-size:.74rem;color:var(--text-muted);line-height:1.6;margin-bottom:16px;">${escHtml(data.summary)}</div>`;
+    if (tc.length) {
+        html += `<div class="section-title">Test Cases</div>`;
+        for (const t of tc) {
+            const ok = t.result==='PASS';
+            html += `<div class="test-case">
+                <div class="test-case-hdr">
+                    <span>${ok?'✅':'❌'}</span>
+                    <span class="test-case-name">${escHtml(t.name||t.test_name||'Test')}</span>
+                    <span class="badge ${ok?'badge-green':'badge-red'}">${t.result||'—'}</span>
+                </div>
+                ${t.message||t.details?`<div class="test-case-body">${escHtml(t.message||t.details)}</div>`:''}
+            </div>`;
+        }
+    }
+    return html;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════
+function normStr(s) { return (s||'').toLowerCase().replace(/\s+/g,' ').trim(); }
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escAttr(s) { return String(s||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;'); }
+function syntaxHL(data) {
+    return String(typeof data==='string'?data:JSON.stringify(data,null,2))
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"([^"]+)":/g,'<span class="json-key">"$1"</span>:')
+        .replace(/: "([^"]*)"/g,': <span class="json-str">"$1"</span>')
+        .replace(/: (\d+\.?\d*)/g,': <span class="json-num">$1</span>')
+        .replace(/: (true|false)/g,': <span class="json-bool">$1</span>')
+        .replace(/: null/g,': <span class="json-null">null</span>');
+}
+
+// ─────────────────────────────────────────────────────────
+//  KEY-VALUE TABLE RENDERER
+// ─────────────────────────────────────────────────────────
+// Render a single scalar/bool/array/object value as HTML (no outer table)
+function renderKVValue(v) {
+    if (typeof v === 'boolean') {
+        return `<span class="${v ? 'bool-yes' : 'bool-no'}">${v ? '✓ Yes' : '✗ No'}</span>`;
+    }
+    if (Array.isArray(v)) {
+        if (!v.length) return '<span style="color:var(--text-muted);">—</span>';
+        // Array of objects → render each as a sub-table separated by a divider
+        if (typeof v[0] === 'object' && v[0] !== null) {
+            return v.map(obj => renderItemKV(obj, [])).join('<hr class="kv-arr-sep">');
+        }
+        // Array of primitives → inline chips
+        return v.map(i => `<span class="kv-list-item">${escHtml(String(i))}</span>`).join(' ');
+    }
+    if (v && typeof v === 'object') {
+        return renderItemKV(v, []);
+    }
+    return escHtml(String(v));
+}
+
+// Render an object as a two-column key/value table.
+// skipKeys: fields already shown elsewhere (desc headline, meta pills).
+function renderItemKV(item, skipKeys) {
+    const SKIP = new Set(skipKeys || []);
+    ['description','item_description','requirement','text'].forEach(k => SKIP.add(k));
+
+    const entries = Object.entries(item).filter(([k, v]) =>
+        !SKIP.has(k) && v !== null && v !== undefined && v !== ''
+    );
+    if (!entries.length) return '';
+
+    let html = '<table class="kv-table">';
+    for (const [k, v] of entries) {
+        const valHtml = renderKVValue(v);
+        if (valHtml === null) continue;
+        html += `<tr><th>${escHtml(k.replace(/_/g,' '))}</th><td>${valHtml}</td></tr>`;
+    }
+    return html + '</table>';
+}
+
+// Render a nested object (e.g. supply_requirements whose values are arrays of items)
+function renderNestedObj(val, color) {
+    const entries = Object.entries(val);
+    let html = '<div style="padding:4px 6px;">';
+    for (const [sk, sv] of entries) {
+        if (sv === null || sv === undefined || sv === '') continue;
+        html += `<div class="kv-section-hdr">${escHtml(sk.replace(/_/g,' '))}</div>`;
+        if (Array.isArray(sv)) {
+            if (!sv.length) {
+                html += `<span style="color:var(--text-muted);font-size:.65rem;padding-left:2px;">None found</span>`;
+            } else {
+                const SHOWN = ['description','item_description','requirement','text',
+                               'source_section','source_page','funding_category',
+                               'responsible_party','amount_or_formula','source_document'];
+                html += sv.map(item => {
+                    if (typeof item === 'string') return `<div class="cat-item" style="border-left:2px solid ${color}40;margin-bottom:3px;"><div class="cat-item-raw">${escHtml(item)}</div></div>`;
+                    const desc = item.description || item.item_description || item.requirement || item.text || '';
+                    return `<div class="cat-item" style="border-left:2px solid ${color}40;margin-bottom:3px;">
+                        ${desc ? `<div class="cat-item-desc">${escHtml(desc)}</div>` : ''}
+                        ${renderItemKV(item, SHOWN)}
+                    </div>`;
+                }).join('');
+            }
+        } else {
+            html += renderKVValue(sv);
+        }
+    }
+    return html + '</div>';
+}
+
+function toggleTheme() {
+    const light = document.documentElement.classList.toggle('light');
+    localStorage.setItem('theme', light ? 'light' : 'dark');
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.textContent = light ? '🌙' : '☀️';
+}
+(function(){ const b=document.getElementById('themeToggleBtn'); if(b) b.textContent=document.documentElement.classList.contains('light')?'🌙':'☀️'; })();
+
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Connections Review Analysis Report</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%22 height=%2232%22 rx=%226%22 fill=%22%23161616%22/%3E%3Crect x=%228%22 y=%2210%22 width=%2216%22 height=%2212%22 rx=%223%22 fill=%22none%22 stroke=%22%234d9fff%22 stroke-width=%222%22/%3E%3C/svg%3E">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a2e; line-height: 1.6; }
+        .container { max-width: 1280px; margin: 0 auto; padding: 24px; }
+
+        /* File loader */
+        .file-loader { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+        .file-loader label { font-weight: 600; font-size: 14px; white-space: nowrap; }
+        .file-loader select { flex: 1; min-width: 260px; max-width: 520px; padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 7px; font-size: 13px; background: white; }
+        .load-btn { padding: 7px 18px; background: #0369a1; color: white; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+        .load-btn:hover:not(:disabled) { background: #0284c7; }
+        .load-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .spinner { text-align: center; padding: 60px; color: #666; font-size: 15px; }
+
+        /* Header */
+        .header { background: linear-gradient(135deg, #0c1a2e 0%, #0369a1 100%); color: white; padding: 32px 40px; border-radius: 12px; margin-bottom: 24px; }
+        .header h1 { font-size: 26px; font-weight: 700; margin-bottom: 4px; }
+        .header .subtitle { opacity: 0.8; font-size: 14px; }
+        .header .meta { display: flex; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
+        .meta-item { background: rgba(255,255,255,0.12); padding: 7px 14px; border-radius: 8px; font-size: 12px; }
+        .meta-label { opacity: 0.7; }
+        .consolidated-link { display: inline-block; margin-top: 12px; font-size: 12px; color: rgba(255,255,255,0.7); text-decoration: none; }
+        .consolidated-link:hover { color: white; }
+
+        /* Summary cards */
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .card { background: white; border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .card-value { font-size: 34px; font-weight: 700; margin-bottom: 3px; }
+        .card-label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+        .card.total .card-value { color: #1a1a2e; }
+        .card.found .card-value { color: #10b981; }
+        .card.notfound .card-value { color: #ef4444; }
+        .card.gap .card-value { color: #f59e0b; }
+        .card.gap2 .card-value { color: #8b5cf6; }
+
+        /* Sections */
+        .section { background: white; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .section-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; }
+        .section-num { width: 28px; height: 28px; border-radius: 50%; background: #0369a1; color: white; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .section-divider { border: none; border-top: 2px solid #f0f2f5; margin: 14px 0; }
+
+        /* Funding tables */
+        .funding-group { margin-bottom: 20px; }
+        .funding-group-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #666; margin-bottom: 8px; }
+        .funding-row { display: flex; gap: 12px; padding: 10px 14px; border-radius: 8px; background: #f8f9fa; margin-bottom: 6px; font-size: 13px; align-items: flex-start; }
+        .funding-row .fi { flex: 1; font-weight: 600; }
+        .funding-row .fd { flex: 2; color: #444; }
+        .funding-row .fa { min-width: 90px; text-align: right; font-weight: 600; color: #0369a1; }
+        .funding-row .fp { min-width: 120px; font-size: 11px; color: #888; text-align: right; }
+        .badge-contestable { background: #fef3c7; color: #92400e; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .badge-noncontestable { background: #dbeafe; color: #1e40af; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .badge-ancillary { background: #f3e8ff; color: #6b21a8; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .payment-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 14px 18px; font-size: 13px; }
+        .payment-box .pl { font-weight: 600; color: #0369a1; margin-right: 8px; }
+
+        /* Gap lists */
+        .gap-list { display: flex; flex-direction: column; gap: 10px; }
+        .gap-item { padding: 12px 16px; border-radius: 8px; background: #f8f9fa; border-left: 4px solid #f59e0b; font-size: 13px; }
+        .gap-item.drawing { border-left-color: #8b5cf6; }
+        .gap-item-title { font-weight: 600; margin-bottom: 3px; }
+        .gap-item-ref { font-size: 11px; color: #888; margin-bottom: 4px; }
+        .gap-item-note { color: #555; font-size: 12px; line-height: 1.5; }
+        .no-gaps { text-align: center; padding: 24px; color: #10b981; font-weight: 600; font-size: 14px; }
+
+        /* Asset register table */
+        .table-wrapper { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { text-align: left; padding: 10px 14px; background: #f8f9fa; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #666; border-bottom: 2px solid #e5e7eb; white-space: nowrap; }
+        td { padding: 9px 14px; border-bottom: 1px solid #f0f2f5; vertical-align: middle; }
+        tr:hover td { background: #f8f9fa; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+        .badge-new       { background: #d1fae5; color: #065f46; }
+        .badge-remove    { background: #fee2e2; color: #991b1b; }
+        .badge-replace   { background: #fef3c7; color: #92400e; }
+        .badge-existing  { background: #e0e7ff; color: #3730a3; }
+        .badge-unknown   { background: #f3f4f6; color: #6b7280; }
+        .badge-found     { background: #d1fae5; color: #065f46; }
+        .badge-notfound  { background: #fee2e2; color: #991b1b; }
+        .badge-high      { background: #dbeafe; color: #1e40af; }
+        .badge-none      { background: #f3f4f6; color: #6b7280; }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 2px solid #e5e7eb; flex-wrap: wrap; }
+        .tab { padding: 9px 18px; border: none; background: none; font-size: 13px; font-weight: 500; color: #666; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; }
+        .tab:hover { color: #1a1a2e; }
+        .tab.active { color: #0369a1; border-bottom-color: #0369a1; font-weight: 600; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .empty-state { text-align: center; padding: 32px; color: #999; }
+
+        /* Supply summary formatted blocks */
+        .supply-intro { font-size:13px; color:#374151; line-height:1.7; margin-bottom:14px; }
+        .supply-supported { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:12px 16px; margin-bottom:14px; }
+        .supply-supported-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:#15803d; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+        .supply-supported-label::before { content:'✓'; font-size:13px; }
+        .supply-supported-text { font-size:13px; color:#166534; line-height:1.6; }
+        .supply-supported-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+        .supply-supported-tags span { font-size:11px; padding:2px 9px; background:#dcfce7; color:#166534; border-radius:10px; font-weight:500; }
+        .supply-gaps-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:#92400e; margin:14px 0 8px; display:flex; align-items:center; gap:6px; }
+        .supply-gaps-label::before { content:'⚠'; font-size:12px; }
+        .supply-gap-numbered { display:flex; gap:10px; padding:9px 14px; border-radius:7px; background:#fffbeb; border-left:3px solid #f59e0b; margin-bottom:6px; font-size:13px; line-height:1.5; }
+        .supply-gap-numbered .gap-num { font-weight:700; color:#b45309; min-width:22px; flex-shrink:0; }
+        .supply-gap-numbered .gap-text { color:#374151; }
+        .supply-action { background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px 16px; margin-top:14px; font-size:13px; color:#1e40af; display:flex; align-items:center; gap:8px; }
+        .supply-action::before { content:'→'; font-weight:700; font-size:15px; }
+        .supply-limitation { background:#faf5ff; border:1px solid #e9d5ff; border-radius:8px; padding:10px 16px; margin-top:14px; font-size:13px; color:#6b21a8; display:flex; align-items:flex-start; gap:8px; }
+        .supply-limitation::before { content:'⚠'; font-size:14px; flex-shrink:0; }
+
+        @media print {
+            body { background: white; }
+            .file-loader { display: none; }
+            .section, .card { box-shadow: none; border: 1px solid #e5e7eb; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="file-loader">
+        <label>Analysis Report:</label>
+        <select id="reportSelect"><option value="">Loading reports…</option></select>
+        <button class="load-btn" id="loadBtn" onclick="loadReport()" disabled>Load</button>
+    </div>
+    <div id="reportContent">
+        <div class="empty-state" style="padding:80px;">
+            <div style="font-size:48px;margin-bottom:16px;">&#128202;</div>
+            <p style="font-size:16px;font-weight:600;margin-bottom:8px;">Loading available reports…</p>
+        </div>
+    </div>
+</div>
+
+<script>
+function esc(str) {
+    const d = document.createElement('div');
+    d.textContent = str == null ? '' : String(str);
+    return d.innerHTML;
+}
+
+function formatSupplySummary(text) {
+    if (!text) return '';
+
+    // Split off a trailing action sentence (starts with "A detailed review" or similar imperatives)
+    const actionPhrases      = ['A detailed review', 'A full review', 'Further review', 'An on-site review', 'Direct review'];
+    const limitationPhrases  = ['The absence of', 'This absence', 'The lack of'];
+    let closingType     = '';   // 'action' | 'limitation' | ''
+    let closingSentence = '';
+    let body = text;
+    for (const phrase of actionPhrases) {
+        const idx = text.indexOf(phrase);
+        if (idx !== -1) { closingSentence = text.slice(idx).trim(); body = text.slice(0, idx).trim(); closingType = 'action'; break; }
+    }
+    if (!closingSentence) {
+        for (const phrase of limitationPhrases) {
+            const idx = text.indexOf(phrase);
+            if (idx !== -1) { closingSentence = text.slice(idx).trim(); body = text.slice(0, idx).trim(); closingType = 'limitation'; break; }
+        }
+    }
+
+    // Split numbered gaps: look for patterns like "(1)", "(2)" etc.
+    const gapRegex = /\((\d+)\)\s+/g;
+    const gapMatches = [...body.matchAll(gapRegex)];
+
+    let intro = body;
+    let gaps = [];
+    if (gapMatches.length > 0) {
+        // Everything before the first numbered item is the intro
+        intro = body.slice(0, gapMatches[0].index).trim().replace(/[;,]\s*$/, '').trim();
+        // Extract each numbered segment
+        gapMatches.forEach((m, i) => {
+            const start = m.index + m[0].length;
+            const end   = i + 1 < gapMatches.length ? gapMatches[i + 1].index : body.length;
+            gaps.push({ num: m[1], text: body.slice(start, end).trim().replace(/[;,]\s*$/, '').trim() });
+        });
+    }
+
+    // Detect inline legend symbol references like (SYMBOL NAME) or bracket groups — highlight them
+    function highlightSymbols(str) {
+        return esc(str).replace(/\(([A-Z][A-Z0-9 _,]+)\)/g, (_, s) =>
+            `<span style="font-size:11px;font-family:monospace;background:#fef9c3;color:#713f12;padding:1px 6px;border-radius:4px;">${s}</span>`
+        );
+    }
+
+    // Detect "supported" sentences — those that mention both legend symbols and supported/confirmed/present
+    const supportKeywords = ['supported by', 'present on', 'corresponding legend', 'legend symbols'];
+    const supportSentences = [];
+    const otherIntroSentences = [];
+
+    intro.split(/(?<=[.!?])\s+/).forEach(sentence => {
+        const lower = sentence.toLowerCase();
+        if (supportKeywords.some(k => lower.includes(k))) {
+            supportSentences.push(sentence);
+        } else if (sentence.trim()) {
+            otherIntroSentences.push(sentence);
+        }
+    });
+
+    let html = '';
+
+    // Intro / context paragraph
+    if (otherIntroSentences.length) {
+        html += `<div class="supply-intro">${otherIntroSentences.map(highlightSymbols).join(' ')}</div>`;
+    }
+
+    // Supported works block
+    if (supportSentences.length) {
+        html += `<div class="supply-supported">
+            <div class="supply-supported-label">Scope Supported by Site Plan</div>
+            <div class="supply-supported-text">${supportSentences.map(highlightSymbols).join(' ')}</div>
+        </div>`;
+    }
+
+    // Numbered gaps
+    if (gaps.length) {
+        html += `<div class="supply-gaps-label">Gaps Identified (${gaps.length})</div>`;
+        gaps.forEach(g => {
+            html += `<div class="supply-gap-numbered">
+                <div class="gap-num">${esc(g.num)}.</div>
+                <div class="gap-text">${highlightSymbols(g.text)}</div>
+            </div>`;
+        });
+    } else if (!supportSentences.length) {
+        // No structure detected — render as plain paragraph
+        html += `<div class="supply-intro">${highlightSymbols(text)}</div>`;
+    }
+
+    // Closing callout — action (blue) or limitation (purple)
+    if (closingSentence) {
+        const cls = closingType === 'limitation' ? 'supply-limitation' : 'supply-action';
+        html += `<div class="${cls}">${esc(closingSentence)}</div>`;
+    }
+
+    return html;
+}
+
+function render(data) {
+    const ar = data.analysis_report || {};
+    const summary = data.summary || {};
+    const generated = data.generated_at ? new Date(data.generated_at).toLocaleString('en-AU') : '—';
+    const sourceRun = esc(data.source_run || '');
+    const consolidatedPath = esc(data.consolidated_report_path || '');
+
+    const funding     = ar.funding_details || {};
+    const fd          = funding.funding_details || funding;
+    const supply      = ar.method_of_supply_comparison || {};
+    const sc          = supply.method_of_supply_comparison || supply;
+    const fundingCmp  = ar.funding_arrangement_comparison || {};
+    const fc          = fundingCmp.funding_arrangement_comparison || fundingCmp;
+    const assetRegObj = ar.asset_register || {};
+    const assetList   = assetRegObj.asset_register || [];
+    const regSummary  = assetRegObj.register_summary || {};
+
+    const totalAssets    = summary.total_assets   || assetList.length;
+    const foundOnDiagram = summary.found_on_diagram ?? regSummary.found_on_diagram ?? 0;
+    const notFound       = summary.not_found      ?? regSummary.not_found ?? 0;
+    const supplyGaps     = summary.supply_scope_gaps  ?? (sc.missing_from_site_plan || []).length;
+    const drawingGaps    = summary.drawing_scope_gaps ?? (fc.missing_from_drawing || []).length;
+
+    const contestable    = fd.contestable_works    || [];
+    const nonContest     = fd.non_contestable_works || [];
+    const ancillary      = fd.ancillary_costs      || [];
+    const otherFunding   = fd.other_funding_items  || [];
+    const paymentInstr   = fd.payment_instructions || {};
+    const fundingNotes   = fd.notes || [];
+
+    let html = '';
+
+    // Header
+    html += `
+    <div class="header">
+        <h1>&#128202; Customer Connections Review Analysis Report</h1>
+        <p class="subtitle">Cross-reference analysis of Design Brief, Site Plan and Asset Register</p>
+        <div class="meta">
+            <div class="meta-item"><span class="meta-label">Generated: </span>${esc(generated)}</div>
+            ${sourceRun ? `<div class="meta-item"><span class="meta-label">Run: </span>${sourceRun}</div>` : ''}
+            <div class="meta-item"><span class="meta-label">Total Assets: </span>${totalAssets}</div>
+            <div class="meta-item"><span class="meta-label">Found on Diagram: </span>${foundOnDiagram}</div>
+            <div class="meta-item"><span class="meta-label">Scope Gaps: </span>${supplyGaps + drawingGaps}</div>
+        </div>
+        ${consolidatedPath ? `<div style="margin-top:10px;font-size:12px;color:rgba(255,255,255,0.6);">&#128203; Completion Test Report: ${consolidatedPath}</div>` : ''}
+    </div>`;
+
+    // Summary cards
+    html += `
+    <div class="summary-grid">
+        <div class="card total"><div class="card-value">${totalAssets}</div><div class="card-label">Total Assets</div></div>
+        <div class="card found"><div class="card-value">${foundOnDiagram}</div><div class="card-label">Found on Diagram</div></div>
+        <div class="card notfound"><div class="card-value">${notFound}</div><div class="card-label">Not Found</div></div>
+        <div class="card gap"><div class="card-value">${supplyGaps}</div><div class="card-label">Supply Scope Gaps</div></div>
+        <div class="card gap2"><div class="card-value">${drawingGaps}</div><div class="card-label">Drawing Scope Gaps</div></div>
+    </div>`;
+
+    // Task 1: Funding Requirements
+    html += `
+    <div class="section">
+        <div class="section-title"><div class="section-num">1</div> Funding Requirements Consolidation</div>
+        <hr class="section-divider">`;
+
+    if (fd.total_capital_contribution) {
+        html += `<div style="margin-bottom:16px;padding:10px 16px;background:#eff6ff;border-radius:8px;font-size:14px;">
+            <strong>Total Capital Contribution:</strong> ${esc(fd.total_capital_contribution)}</div>`;
+    }
+
+    function renderFundingRows(items, badgeClass, badgeLabel) {
+        if (!items || items.length === 0) return `<p style="color:#999;font-size:13px;padding:8px 0;">None recorded</p>`;
+        return items.map(item => `
+        <div class="funding-row">
+            <div class="fi">${esc(item.item || item.description || '')}</div>
+            <div class="fd">${esc(item.description !== item.item ? (item.description || '') : '')}</div>
+            <div class="fa">${item.amount ? esc(item.amount) : '<span style="color:#ccc">—</span>'}</div>
+            <div class="fp"><span class="${badgeClass}">${badgeLabel}</span>${item.responsible_party ? `<br><span style="color:#aaa">${esc(item.responsible_party)}</span>` : ''}</div>
+        </div>`).join('');
+    }
+
+    if (contestable.length) {
+        html += `<div class="funding-group"><div class="funding-group-label">Contestable Works (Customer Funded)</div>${renderFundingRows(contestable, 'badge-contestable', 'Contestable')}</div>`;
+    }
+    if (nonContest.length) {
+        html += `<div class="funding-group"><div class="funding-group-label">Non-Contestable Works (Network Owner)</div>${renderFundingRows(nonContest, 'badge-noncontestable', 'Non-Contestable')}</div>`;
+    }
+    if (ancillary.length) {
+        html += `<div class="funding-group"><div class="funding-group-label">Ancillary Costs &amp; Charges</div>${renderFundingRows(ancillary, 'badge-ancillary', 'Ancillary')}</div>`;
+    }
+    if (otherFunding.length) {
+        html += `<div class="funding-group"><div class="funding-group-label">Other Funding Items</div>${renderFundingRows(otherFunding, 'badge-ancillary', 'Other')}</div>`;
+    }
+
+    if (paymentInstr && (paymentInstr.method || paymentInstr.bsb)) {
+        html += `<div class="funding-group"><div class="funding-group-label">Payment Instructions</div>
+        <div class="payment-box">
+            ${paymentInstr.method ? `<div><span class="pl">Method:</span>${esc(paymentInstr.method)}</div>` : ''}
+            ${paymentInstr.bsb    ? `<div><span class="pl">BSB:</span>${esc(paymentInstr.bsb)}</div>` : ''}
+            ${paymentInstr.account ? `<div><span class="pl">Account:</span>${esc(paymentInstr.account)}</div>` : ''}
+            ${paymentInstr.reference ? `<div><span class="pl">Reference:</span><strong>${esc(paymentInstr.reference)}</strong></div>` : ''}
+        </div></div>`;
+    }
+
+    if (fundingNotes.length) {
+        html += `<div style="margin-top:8px;font-size:12px;color:#666;"><strong>Notes:</strong> ${fundingNotes.map(esc).join(' | ')}</div>`;
+    }
+    html += `</div>`;
+
+    // Task 2: Method of Supply Comparison
+    const missingSupply = sc.missing_from_site_plan || [];
+    const dbReqs = sc.design_brief_requirements || [];
+    html += `
+    <div class="section">
+        <div class="section-title"><div class="section-num">2</div> Method of Supply Scope Comparison
+            ${missingSupply.length ? `<span style="margin-left:auto;font-size:12px;background:#fef3c7;color:#92400e;padding:3px 12px;border-radius:12px;font-weight:600;">${missingSupply.length} gap${missingSupply.length !== 1 ? 's' : ''} found</span>` : ''}
+        </div>
+        <hr class="section-divider">
+        ${sc.summary ? formatSupplySummary(sc.summary) : ''}`;
+
+    if (dbReqs.length) {
+        html += `<div style="margin-bottom:16px;">
+            <div class="funding-group-label">Design Brief Requirements</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            ${dbReqs.map(r => {
+                const label = r.item || r.description || r;
+                const cat = r.category || '';
+                return `<span style="font-size:12px;padding:4px 10px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;">${cat ? `<strong>${esc(cat)}</strong> · ` : ''}${esc(label)}</span>`;
+            }).join('')}
+            </div></div>`;
+    }
+
+    if (missingSupply.length === 0) {
+        html += `<div class="no-gaps">&#10003; No scope gaps identified between Design Brief and Site Plan</div>`;
+    } else {
+        html += `<div class="funding-group-label">Missing from Site Plan (${missingSupply.length} items)</div>
+        <div class="gap-list">`;
+        missingSupply.forEach(g => {
+            html += `<div class="gap-item">
+                <div class="gap-item-title">${esc(g.item)}</div>
+                <div class="gap-item-ref">Ref: ${esc(g.design_brief_reference)}</div>
+                <div class="gap-item-note">${esc(g.note)}</div>
+            </div>`;
+        });
+        html += `</div>`;
+    }
+    html += `</div>`;
+
+    // Task 3: Funding Arrangement Comparison
+    const missingDrawing = fc.missing_from_drawing || [];
+    const dbFundedWorks = fc.design_brief_funded_works || [];
+    html += `
+    <div class="section">
+        <div class="section-title"><div class="section-num">3</div> Funding Arrangement Scope Comparison
+            ${missingDrawing.length ? `<span style="margin-left:auto;font-size:12px;background:#f3e8ff;color:#6b21a8;padding:3px 12px;border-radius:12px;font-weight:600;">${missingDrawing.length} gap${missingDrawing.length !== 1 ? 's' : ''} found</span>` : ''}
+        </div>
+        <hr class="section-divider">
+        ${fc.summary ? formatSupplySummary(fc.summary) : ''}`;
+
+    if (dbFundedWorks.length) {
+        html += `<div style="margin-bottom:16px;">
+            <div class="funding-group-label">Design Brief Funded Works</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            ${dbFundedWorks.map(w => {
+                const label = w.item || w;
+                const cat = w.funding_category || '';
+                return `<span style="font-size:12px;padding:4px 10px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:12px;">${cat ? `<strong>${esc(cat)}</strong> · ` : ''}${esc(label)}</span>`;
+            }).join('')}
+            </div></div>`;
+    }
+
+    if (missingDrawing.length === 0) {
+        html += `<div class="no-gaps">&#10003; No scope gaps identified between Design Brief and Design Drawing</div>`;
+    } else {
+        html += `<div class="funding-group-label">Missing from Drawing (${missingDrawing.length} items)</div>
+        <div class="gap-list">`;
+        missingDrawing.forEach(g => {
+            html += `<div class="gap-item drawing">
+                <div class="gap-item-title">${esc(g.item)}</div>
+                <div class="gap-item-ref">Ref: ${esc(g.design_brief_reference)}</div>
+                <div class="gap-item-note">${esc(g.note)}</div>
+            </div>`;
+        });
+        html += `</div>`;
+    }
+    html += `</div>`;
+
+    // Task 4: Asset Register
+    const newCount      = regSummary.new      ?? assetList.filter(a => a.action_status === 'new').length;
+    const removeCount   = regSummary.remove   ?? assetList.filter(a => a.action_status === 'remove').length;
+    const replaceCount  = regSummary.replace  ?? assetList.filter(a => a.action_status === 'replace').length;
+    const existingCount = regSummary.existing ?? assetList.filter(a => a.action_status === 'existing').length;
+
+    html += `
+    <div class="section">
+        <div class="section-title"><div class="section-num">4</div> Asset Register</div>
+        <hr class="section-divider">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;font-size:12px;">
+            <span style="padding:4px 12px;background:#f3f4f6;border-radius:12px;"><strong>${totalAssets}</strong> Total</span>
+            ${newCount      ? `<span style="padding:4px 12px;background:#d1fae5;color:#065f46;border-radius:12px;font-weight:600;">&#10003; ${newCount} New</span>` : ''}
+            ${removeCount   ? `<span style="padding:4px 12px;background:#fee2e2;color:#991b1b;border-radius:12px;font-weight:600;">&#10007; ${removeCount} Remove</span>` : ''}
+            ${replaceCount  ? `<span style="padding:4px 12px;background:#fef3c7;color:#92400e;border-radius:12px;font-weight:600;">&#8635; ${replaceCount} Replace</span>` : ''}
+            ${existingCount ? `<span style="padding:4px 12px;background:#e0e7ff;color:#3730a3;border-radius:12px;font-weight:600;">&#8226; ${existingCount} Existing</span>` : ''}
+            <span style="padding:4px 12px;background:#d1fae5;border-radius:12px;">&#128270; ${foundOnDiagram} found on diagram</span>
+            <span style="padding:4px 12px;background:#fee2e2;border-radius:12px;">&#10007; ${notFound} not found</span>
+        </div>`;
+
+    if (assetList.length === 0) {
+        html += `<div class="empty-state"><p>No asset records in this report</p></div>`;
+    } else {
+        const foundList   = assetList.filter(a => a.found_on_diagram);
+        const notFoundList = assetList.filter(a => !a.found_on_diagram);
+
+        html += `
+        <div class="tabs">
+            <button class="tab active" data-tab="ar-all">All (${assetList.length})</button>
+            <button class="tab" data-tab="ar-found">Found on Diagram (${foundList.length})</button>
+            <button class="tab" data-tab="ar-notfound">Not Found (${notFoundList.length})</button>
+        </div>
+        <div class="tab-content active" id="tab-ar-all">${renderAssetTable(assetList)}</div>
+        <div class="tab-content" id="tab-ar-found">${foundList.length ? renderAssetTable(foundList) : '<div class="empty-state"><p>No assets found on diagram</p></div>'}</div>
+        <div class="tab-content" id="tab-ar-notfound">${notFoundList.length ? renderAssetTable(notFoundList) : '<div class="empty-state"><p>All assets found on diagram</p></div>'}</div>`;
+    }
+    html += `</div>`;
+
+    document.getElementById('reportContent').innerHTML = html;
+
+    // Tab listeners
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            const group = this.closest('.section');
+            group.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            group.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+            this.classList.add('active');
+            group.querySelector('#tab-' + this.dataset.tab).classList.add('active');
+        });
+    });
+}
+
+function renderAssetTable(items) {
+    return `
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>TAL Asset ID</th>
+                    <th>Site Plan ID</th>
+                    <th>Serial No.</th>
+                    <th>Source Sheet</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Legend Label</th>
+                    <th>Symbol</th>
+                    <th>Action</th>
+                    <th>Found on Diagram</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${items.map((a, i) => {
+                    const action  = (a.action_status || 'unknown').toLowerCase();
+                    const talId   = a.tal_asset_id || a.asset_id || '';
+                    const bareId  = a.bare_id || '';
+                    const matched = a.found_on_diagram;
+                    // Traceability link: show arrow when IDs are both present and asset was found
+                    const traceCell = bareId
+                        ? `<span style="font-family:monospace;font-size:12px;background:${matched ? '#d1fae5' : '#f3f4f6'};color:${matched ? '#065f46' : '#6b7280'};padding:2px 8px;border-radius:6px;">${esc(bareId)}</span>`
+                        : '<span style="color:#ccc">—</span>';
+                    const talCell = talId
+                        ? `<span style="font-family:monospace;font-size:12px;">${esc(talId)}</span>${bareId && matched ? ' <span style="color:#10b981;font-size:11px;" title="Matched on site plan">&#8594;</span>' : ''}`
+                        : '<span style="color:#ccc">—</span>';
+                    return `<tr>
+                        <td style="color:#999;">${i + 1}</td>
+                        <td>${talCell}</td>
+                        <td>${traceCell}</td>
+                        <td style="font-family:monospace;font-size:12px;color:#555;">${esc(a.serial_number || '—')}</td>
+                        <td style="font-size:12px;color:#555;">${esc(a.source_sheet || '—')}</td>
+                        <td>${esc(a.asset_type || '—')}</td>
+                        <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${esc(a.description)}">${esc(a.description || '—')}</td>
+                        <td>${a.legend_label ? `<span class="badge badge-${action}">${esc(a.legend_label)}</span>` : '<span style="color:#ccc">—</span>'}</td>
+                        <td style="max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:#555;" title="${esc(a.symbol_description)}">${esc(a.symbol_description || '—')}</td>
+                        <td><span class="badge badge-${action}">${action}</span></td>
+                        <td>${matched
+                            ? `<span class="badge badge-found">&#10003; Found</span>`
+                            : `<span class="badge badge-notfound">&#10007; Not Found</span>`}</td>
+                    </tr>`;
+                }).join('')}
+            </tbody>
+        </table>
+    </div>`;
+}
+
+async function init() {
+    const sel = document.getElementById('reportSelect');
+    const btn = document.getElementById('loadBtn');
+    try {
+        const r = await fetch('/api/orchestrator/output_files');
+        if (!r.ok) throw new Error('Failed to fetch file list');
+        const d = await r.json();
+        const files = (d.files || [])
+            .filter(f => f.filename.replace(/\\/g, '/').split('/').pop().startsWith('AnalysisReport_'))
+            .sort((a, b) => (b.modified_ts || 0) - (a.modified_ts || 0));
+
+        if (!files.length) {
+            sel.innerHTML = '<option value="">No analysis reports found</option>';
+            document.getElementById('reportContent').innerHTML =
+                '<div class="empty-state" style="padding:80px;"><div style="font-size:48px;margin-bottom:16px;">&#128202;</div>' +
+                '<p style="font-size:16px;font-weight:600;margin-bottom:8px;">No analysis reports found</p>' +
+                '<p style="font-size:14px;">Run Step 11 to generate an <strong>AnalysisReport_*.json</strong></p></div>';
+            return;
+        }
+
+        sel.innerHTML = files.map(f => {
+            const basename = f.filename.replace(/\\/g, '/').split('/').pop();
+            const runDir   = f.filename.replace(/\\/g, '/').split('/').slice(-2, -1)[0] || '';
+            const ts       = basename.replace('AnalysisReport_', '').replace('.json', '');
+            let label = ts;
+            if (/^\d{8}T\d{6}/.test(ts)) {
+                label = `${ts.slice(0,4)}-${ts.slice(4,6)}-${ts.slice(6,8)} ${ts.slice(9,11)}:${ts.slice(11,13)}:${ts.slice(13,15)}`;
+            }
+            const kb = f.size_bytes ? ` (${(f.size_bytes / 1024).toFixed(0)} KB)` : '';
+            const run = runDir ? ` — ${runDir}` : '';
+            return `<option value="${esc(f.filename)}">${esc(label)}${kb}${esc(run)}</option>`;
+        }).join('');
+
+        btn.disabled = false;
+        loadReport();
+    } catch(e) {
+        sel.innerHTML = `<option value="">Error: ${esc(e.message)}</option>`;
+        document.getElementById('reportContent').innerHTML =
+            `<div class="empty-state" style="padding:60px;"><p style="color:#ef4444;">Failed to load report list: ${esc(e.message)}</p></div>`;
+    }
+}
+
+async function loadReport() {
+    const filename = document.getElementById('reportSelect').value;
+    const btn      = document.getElementById('loadBtn');
+    const cont     = document.getElementById('reportContent');
+    if (!filename) return;
+    btn.disabled = true;
+    cont.innerHTML = '<div class="spinner">Loading report…</div>';
+    try {
+        const r = await fetch(`/api/orchestrator/output_file/${encodeURIComponent(filename)}`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        render(await r.json());
+    } catch(e) {
+        cont.innerHTML = `<div class="empty-state" style="padding:60px;"><p style="color:#ef4444;">Failed to load: ${esc(e.message)}</p></div>`;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+document.getElementById('reportSelect').addEventListener('change', loadReport);
+
+init();
+</script>
+</body>
+</html>
