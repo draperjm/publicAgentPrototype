@@ -1,0 +1,13 @@
+# Dockerfile.mapper
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements_mapper.txt .
+RUN pip install --no-cache-dir -r requirements_mapper.txt
+
+COPY mapping_agent.py .
+
+EXPOSE 8087
+
+CMD ["uvicorn", "mapping_agent:app", "--host", "0.0.0.0", "--port", "8087"]

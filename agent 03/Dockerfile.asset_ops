@@ -1,0 +1,17 @@
+# Dockerfile.asset_ops
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies (needed for some python packages)
+RUN apt-get update && apt-get install -y gcc && rm -rf /var/lib/apt/lists/*
+
+COPY requirements_assets.txt .
+RUN pip install --no-cache-dir -r requirements_assets.txt
+
+COPY asset_ops.py .
+
+# Expose port 8084 (or any free port in your stack)
+EXPOSE 8084
+
+CMD ["uvicorn", "asset_ops:app", "--host", "0.0.0.0", "--port", "8084"]

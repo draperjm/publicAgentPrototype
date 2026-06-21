@@ -1,0 +1,202 @@
+{
+  "templates": [
+    {
+      "template_id": "tmpl-q4-release-review",
+      "name": "Q4 Release Compliance Review",
+      "description": "Standard procedure for validating the Q4 software release candidate against compliance and security standards.",
+      "triggers": [
+        "review release",
+        "q4 audit",
+        "release validation"
+      ],
+      "estimated_duration": "5m",
+      "steps": [
+        {
+          "step_number": 1,
+          "name": "Fetch Release Artifacts",
+          "description": "Retrieve the build manifest and changelog for the latest Q4 candidate.",
+          "required_resources": {
+            "agent_id": "agent-devops-01",
+            "tool_id": "tool-github-fetch",
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Must return a JSON object containing 'build_id' and 'commit_hash'.",
+            "retry_on_failure": true,
+            "max_retries": 3
+          }
+        },
+        {
+          "step_number": 2,
+          "name": "Compliance Scan",
+          "description": "Compare the changelog against the 2025 IT Security Policy to identify banned libraries or patterns.",
+          "required_resources": {
+            "agent_id": "agent-compliance-01",
+            "tool_id": null,
+            "knowledge_id": "kb-it-policy-2025"
+          },
+          "validation": {
+            "criteria": "Must produce a list of 'violations'. If list is empty, return 'status: compliant'.",
+            "critical_fail": true
+          }
+        },
+        {
+          "step_number": 3,
+          "name": "Generate Final Report",
+          "description": "Compile findings into a PDF report for the CTO.",
+          "required_resources": {
+            "agent_id": "agent-reporter-01",
+            "tool_id": "tool-pdf-generator",
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Output must be a valid file path ending in .pdf",
+            "critical_fail": false
+          }
+        }
+      ]
+    },
+    {
+      "template_id": "tmpl-cc-review-asset-number-check",
+      "name": "Junior Engineer: Asset Number Diagram Check",
+      "description": "Standard procedure for validating all assets are represented on a line diagram.",
+      "triggers": [
+        "review diagram",
+        "connections audit",
+        "submission validation"
+      ],
+      "estimated_duration": "5m",
+      "steps": [
+        {
+          "step_number": 1,
+          "name": "Fetch customer connections submission asset data",
+          "description": "Send the raw asset information file (CSV, Excel, JSON, or Doc) to the Asset Ops Agent for LLM extraction and logging.",
+          "required_resources": {
+            "agent_id": "agent-asset-ops",
+            "tool_id": null,
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Must return a JSON object with an 'assets' key containing a list of items with 'asset_number' and 'asset_type'.",
+            "retry_on_failure": true,
+            "max_retries": 3
+          }
+        },
+        {
+          "step_number": 2,
+          "name": "Extract Asset types from asset legend diagram",
+          "description": "Analyse each icon and create a descriptive description, extract the matching text for the icon and create a JSON file with Icon description and Icon Text.",
+          "required_resources": {
+            "agent_id": "agent-content-reviewer",
+            "tool_id": null,
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Must return a JSON object with the text for each icon 'Icon' and a discription of the icon 'asset_type' into a JSON format of asset_types.",
+            "critical_fail": true
+          }
+        },
+        {
+          "step_number": 3,
+          "name": "Create Asset-to-Legend Mapping",
+          "description": "Join the extracted asset data from Step 1 with the legend icon data from Step 2. For each asset, match the asset_type to its corresponding legend icon description and produce a unified mapping file.",
+          "required_resources": {
+            "agent_id": "agent-mapper",
+            "tool_id": null,
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Must return a JSON object with an 'asset_map' key containing a list of items with 'asset_number', 'asset_type', and 'expected_icon_description'. Items without a legend match must show 'NOT FOUND IN LEGEND'.",
+            "critical_fail": true
+          }
+        },
+        {
+          "step_number": 4,
+          "name": "Verify Assets vs Legend",
+          "description": "Invoke the Verification Agent. Request the user to upload the P&ID Drawing file (PDF or Image) to visually cross-reference the mapped Asset List against the Legend.",
+          "required_resources": {
+            "agent_id": "agent-verification",
+            "tool_id": null,
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Output must be a valid JSON object containing a 'verification_report' list with status flags for each asset.",
+            "critical_fail": true
+          }
+        }
+      ]
+    },
+    {
+      "template_id": "tmpl-jr-easement-requirements-review",
+      "name": "Junior Engineer: Review Easement Requirements",
+      "description": "Standard procedure for reviewing a submitted easement schedule against applicable engineering or planning requirements and verifying correct depiction on the cadastral or corridor drawing.",
+      "triggers": [
+        "review easement",
+        "easement check",
+        "easement requirements",
+        "easement audit",
+        "corridor review"
+      ],
+      "estimated_duration": "8m",
+      "steps": [
+        {
+          "step_number": 1,
+          "name": "Extract easement schedule from submission",
+          "description": "Upload the easement schedule or submission file (CSV, Excel, JSON, or DOCX) to the Asset Ops Agent. Extract each easement record including the easement identifier, easement type (e.g. Drainage, Access, Electricity, Pipeline, Water), width, affected lot or parcel, and stated purpose.",
+          "required_resources": {
+            "agent_id": "agent-asset-ops",
+            "tool_id": null,
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Must return a JSON object with an 'assets' key containing a list of items, each with 'asset_number' (easement identifier) and 'asset_type' (easement type such as Drainage, Access, Electricity, etc.).",
+            "retry_on_failure": true,
+            "max_retries": 3
+          }
+        },
+        {
+          "step_number": 2,
+          "name": "Extract easement requirements from standards document",
+          "description": "Upload the easement requirements document (PDF or DOCX) \u2014 such as a council planning scheme, engineering design standard, or developer requirements schedule. Analyse each easement type section and extract the minimum width, permitted uses, prohibited structures, setback conditions, and any special notes for each easement type. Produce a structured JSON list of easement type requirements.",
+          "required_resources": {
+            "agent_id": "agent-content-reviewer",
+            "tool_id": null,
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Must return a JSON object with an 'asset_types' key containing a list of easement requirement entries, each with 'Icon' (easement type name) and 'asset_type' (description of requirements including minimum width and conditions).",
+            "critical_fail": true
+          }
+        },
+        {
+          "step_number": 3,
+          "name": "Map easements to applicable requirements",
+          "description": "Join the submitted easement records from Step 1 with the extracted requirement definitions from Step 2. For each easement, match its easement_type to the corresponding requirement entry using exact and fuzzy matching. Produce a unified compliance mapping that identifies whether each easement has an applicable requirement or is unrecognised.",
+          "required_resources": {
+            "agent_id": "agent-mapper",
+            "tool_id": null,
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Must return a JSON object with an 'asset_map' key containing a list of items with 'asset_number' (easement identifier), 'asset_type' (easement type), and 'expected_icon_description' (applicable requirement conditions). Easements with no matching requirement must show 'NOT FOUND IN REQUIREMENTS'.",
+            "critical_fail": true
+          }
+        },
+        {
+          "step_number": 4,
+          "name": "Verify easements on cadastral or corridor drawing",
+          "description": "Invoke the Verification Agent. Request the user to upload the cadastral survey drawing, lot plan, or corridor diagram (PDF or Image). Visually cross-reference the mapped easement schedule against the drawing to confirm every easement is correctly depicted \u2014 checking easement type labels, widths, extents, and affected lots match the submitted schedule.",
+          "required_resources": {
+            "agent_id": "agent-verification",
+            "tool_id": null,
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Output must be a valid JSON object containing a 'verification_report' list with status flags for each easement, confirming whether it is correctly shown on the drawing with accurate type, width, and extent.",
+            "critical_fail": true
+          }
+        }
+      ]
+    }
+  ]
+}

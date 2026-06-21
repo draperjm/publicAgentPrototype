@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asset Verification Report</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5;
+            color: #1a1a2e;
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            padding: 32px 40px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+        .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+        .header .subtitle { opacity: 0.8; font-size: 14px; }
+        .header .meta {
+            display: flex;
+            gap: 24px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+        .header .meta-item {
+            background: rgba(255,255,255,0.1);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        .meta-label { opacity: 0.7; }
+
+        /* Summary Cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .card-value {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .card-label { font-size: 13px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+        .card.total .card-value { color: #1a1a2e; }
+        .card.verified .card-value { color: #10b981; }
+        .card.missing .card-value { color: #ef4444; }
+        .card.rate .card-value { color: #3b82f6; }
+
+        /* Progress Bar */
+        .progress-section { margin-bottom: 24px; }
+        .progress-bar-bg {
+            background: #e5e7eb;
+            border-radius: 12px;
+            height: 24px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 12px;
+            transition: width 0.8s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+        }
+        .progress-bar-fill.good { background: linear-gradient(90deg, #10b981, #059669); }
+        .progress-bar-fill.warn { background: linear-gradient(90deg, #f59e0b, #d97706); }
+        .progress-bar-fill.bad { background: linear-gradient(90deg, #ef4444, #dc2626); }
+
+        /* Sections */
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .section h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #f0f2f5;
+        }
+
+        /* Breakdown chart */
+        .breakdown-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        .breakdown-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .breakdown-icon {
+            width: 40px; height: 40px;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; color: white; font-weight: 700;
+            flex-shrink: 0;
+        }
+        .breakdown-icon.substation { background: #8b5cf6; }
+        .breakdown-icon.column { background: #3b82f6; }
+        .breakdown-icon.pillar { background: #f59e0b; }
+        .breakdown-info { flex: 1; }
+        .breakdown-type { font-weight: 600; font-size: 14px; }
+        .breakdown-count { font-size: 12px; color: #666; }
+        .breakdown-bar { height: 4px; background: #e5e7eb; border-radius: 2px; margin-top: 4px; }
+        .breakdown-bar-fill { height: 100%; border-radius: 2px; }
+
+        /* Tables */
+        .table-wrapper { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th {
+            text-align: left;
+            padding: 12px 16px;
+            background: #f8f9fa;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #666;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f0f2f5;
+        }
+        tr:hover td { background: #f8f9fa; }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-verified { background: #d1fae5; color: #065f46; }
+        .badge-missing { background: #fee2e2; color: #991b1b; }
+        .badge-mismatch { background: #fef3c7; color: #92400e; }
+        .badge-high { background: #dbeafe; color: #1e40af; }
+        .badge-medium { background: #fef3c7; color: #92400e; }
+        .badge-low { background: #fee2e2; color: #991b1b; }
+
+        /* Test Results */
+        .test-grid { display: flex; flex-direction: column; gap: 12px; }
+        .test-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        .test-icon {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; flex-shrink: 0;
+        }
+        .test-icon.pass { background: #d1fae5; color: #065f46; }
+        .test-icon.fail { background: #fee2e2; color: #991b1b; }
+        .test-info { flex: 1; }
+        .test-name { font-weight: 600; font-size: 14px; }
+        .test-desc { font-size: 12px; color: #666; margin-top: 2px; }
+        .test-result { font-weight: 600; font-size: 13px; }
+        .test-result.pass { color: #059669; }
+        .test-result.fail { color: #dc2626; }
+
+        /* File Loader */
+        .file-loader {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .file-loader label {
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .file-input-wrapper {
+            position: relative;
+        }
+        .file-input-wrapper input[type="file"] {
+            font-size: 14px;
+        }
+        .load-btn {
+            padding: 8px 20px;
+            background: #1a1a2e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .load-btn:hover { background: #16213e; }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .tab {
+            padding: 10px 20px;
+            border: none;
+            background: none;
+            font-size: 14px;
+            font-weight: 500;
+            color: #666;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+        .tab:hover { color: #1a1a2e; }
+        .tab.active { color: #1a1a2e; border-bottom-color: #3b82f6; font-weight: 600; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+
+        @media print {
+            body { background: white; }
+            .file-loader { display: none; }
+            .card, .section { box-shadow: none; border: 1px solid #e5e7eb; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="file-loader">
+        <label>Load Report:</label>
+        <div class="file-input-wrapper">
+            <input type="file" id="verificationFile" accept=".json">
+        </div>
+        <input type="file" id="testReportFile" accept=".json" style="display:none;">
+        <label for="testReportFile" class="load-btn" style="cursor:pointer;">Load Test Report (optional)</label>
+    </div>
+
+    <div id="reportContent"></div>
+</div>
+
+<script>
+// Embedded data from latest reports
+const defaultVerification = {"verification_report":[{"asset_number":"SUB 95988","asset_type":"New Padmount Substation","expected_icon_description":"Large hollow square with an 'X' drawn inside","status":"VERIFIED","observed_symbol":"Large hollow square with an 'X' drawn inside","confidence":"High"},{"asset_number":"2004852","asset_type":"New Column","expected_icon_description":"Small hollow square","status":"VERIFIED","observed_symbol":"Small hollow square","confidence":"High"},{"asset_number":"2004853","asset_type":"New Column","expected_icon_description":"Small hollow square","status":"VERIFIED","observed_symbol":"Small hollow square","confidence":"High"},{"asset_number":"2004854","asset_type":"NEW COLUMN","expected_icon_description":"Small hollow square","status":"VERIFIED","observed_symbol":"Small hollow square","confidence":"High"},{"asset_number":"2114855","asset_type":"New Column","expected_icon_description":"Small hollow square","status":"MISSING_ON_DRAWING","observed_symbol":"Not found on drawing","confidence":"High"},{"asset_number":"2224856","asset_type":"New Column","expected_icon_description":"Small hollow square","status":"MISSING_ON_DRAWING","observed_symbol":"Not found on drawing","confidence":"High"},{"asset_number":"2004857","asset_type":"New Column","expected_icon_description":"Small hollow square","status":"VERIFIED","observed_symbol":"Small hollow square","confidence":"High"},{"asset_number":"2004858","asset_type":"New Column","expected_icon_description":"Small hollow square","status":"VERIFIED","observed_symbol":"Small hollow square","confidence":"High"},{"asset_number":"2004859","asset_type":"New Column","expected_icon_description":"Small hollow square","status":"VERIFIED","observed_symbol":"Small hollow square","confidence":"High"},{"asset_number":"2004860","asset_type":"New Column","expected_icon_description":"Small hollow square","status":"VERIFIED","observed_symbol":"Small hollow square","confidence":"High"},{"asset_number":"2004861","asset_type":"New Column","expected_icon_description":"Small hollow square","status":"VERIFIED","observed_symbol":"Small hollow square","confidence":"High"},{"asset_number":"2004862","asset_type":"New Column","expected_icon_description":"Small hollow square","status":"VERIFIED","observed_symbol":"Small hollow square","confidence":"High"},{"asset_number":"2004863","asset_type":"New Column","expected_icon_description":"Small hollow square","status":"VERIFIED","observed_symbol":"Small hollow square","confidence":"High"},{"asset_number":"2004864","asset_type":"New Column","expected_icon_description":"Small hollow square","status":"VERIFIED","observed_symbol":"Small hollow square","confidence":"High"},{"asset_number":"2004865","asset_type":"New Column","expected_icon_description":"Small hollow square","status":"VERIFIED","observed_symbol":"Small hollow square","confidence":"High"},{"asset_number":"2004866","asset_type":"New Column","expected_icon_description":"Small hollow square","status":"VERIFIED","observed_symbol":"Small hollow square","confidence":"High"},{"asset_number":"2004867","asset_type":"New Column","expected_icon_description":"Small hollow square","status":"VERIFIED","observed_symbol":"Small hollow square","confidence":"High"},{"asset_number":"2004868","asset_type":"New Column","expected_icon_description":"Small hollow square","status":"VERIFIED","observed_symbol":"Small hollow square","confidence":"High"},{"asset_number":"2004869","asset_type":"New Column","expected_icon_description":"Small hollow square","status":"VERIFIED","observed_symbol":"Small hollow square","confidence":"High"},{"asset_number":"S405104","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"405105","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"405108","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"405109","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"S405110","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"405111","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"405112","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"S405113","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"405114","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"405115","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"S405116","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"S405117","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"S405118","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"405119","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"405120","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"405121","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"405122","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"405123","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"},{"asset_number":"405125","asset_type":"New Pillar","expected_icon_description":"Small hollow vertical rectangle","status":"VERIFIED","observed_symbol":"Small hollow vertical rectangle","confidence":"High"}]};
+
+const defaultTestReport = {"test_run_summary":{"overall_result":"PASS","confidence":"Medium","score":100,"summary":"The agent successfully generated a verification report for all provided assets, maintaining the input structure and data. The visual verification results (status and observed symbol) appear internally consistent, though direct visual cross-reference against the binary image file could not be performed.","total_tests":6,"passed":6,"failed":0},"test_cases":[{"test_id":"TC-001","test_name":"Output JSON Format Validation","category":"FORMAT","result":"PASS","description":"Verifies that the agent's output is a valid JSON object and adheres to the expected top-level structure."},{"test_id":"TC-002","test_name":"Completeness of Verification Report Entries","category":"COMPLETENESS","result":"PASS","description":"Ensures that every asset provided in the 'asset_map' input data has a corresponding entry in the 'verification_report' output."},{"test_id":"TC-003","test_name":"Correctness of Asset Data Passthrough","category":"CORRECTNESS","result":"PASS","description":"Verifies that asset details from the input 'asset_map' are accurately reflected in the corresponding output 'verification_report' entries."},{"test_id":"TC-004","test_name":"Consistency of status and observed_symbol fields","category":"CONSISTENCY","result":"PASS","description":"Checks that the 'status' and 'observed_symbol' fields are logically consistent based on the agent's reported findings."},{"test_id":"TC-005","test_name":"Validation of confidence field","category":"CONSISTENCY","result":"PASS","description":"Verifies that the 'confidence' field is present and set to 'High' for all entries."},{"test_id":"TC-006","test_name":"Verification of specific asset types and their icons","category":"DATA_INTEGRITY","result":"PASS","description":"Spot-checks if asset types are correctly verified against their expected icons in the legend."}]};
+
+let currentVerification = defaultVerification;
+let currentTestReport = defaultTestReport;
+
+function render() {
+    const assets = currentVerification.verification_report;
+    const total = assets.length;
+    const verified = assets.filter(a => a.status === 'VERIFIED').length;
+    const missing = assets.filter(a => a.status === 'MISSING_ON_DRAWING').length;
+    const mismatch = assets.filter(a => a.status === 'SYMBOL_MISMATCH').length;
+    const rate = total > 0 ? ((verified / total) * 100).toFixed(1) : 0;
+
+    // Group by asset type (normalised)
+    const typeGroups = {};
+    assets.forEach(a => {
+        const key = a.asset_type.replace(/^new\s+/i, 'New ').replace(/^NEW\s+/, 'New ');
+        if (!typeGroups[key]) typeGroups[key] = { total: 0, verified: 0, missing: 0, mismatch: 0 };
+        typeGroups[key].total++;
+        if (a.status === 'VERIFIED') typeGroups[key].verified++;
+        else if (a.status === 'MISSING_ON_DRAWING') typeGroups[key].missing++;
+        else if (a.status === 'SYMBOL_MISMATCH') typeGroups[key].mismatch++;
+    });
+
+    // Confidence breakdown
+    const confGroups = {};
+    assets.forEach(a => {
+        confGroups[a.confidence] = (confGroups[a.confidence] || 0) + 1;
+    });
+
+    const progressClass = rate >= 90 ? 'good' : rate >= 70 ? 'warn' : 'bad';
+    const overallStatus = missing === 0 && mismatch === 0 ? 'ALL ASSETS VERIFIED' :
+                          missing > 0 ? `${missing} ASSET${missing > 1 ? 'S' : ''} MISSING` : 'ISSUES FOUND';
+    const statusColor = missing === 0 && mismatch === 0 ? '#10b981' : '#ef4444';
+
+    let html = `
+    <div class="header">
+        <h1>Asset Verification Report</h1>
+        <p class="subtitle">P&amp;ID Drawing - Visual Cross-Reference Validation</p>
+        <div class="meta">
+            <div class="meta-item"><span class="meta-label">Status:</span> <span style="color:${statusColor};font-weight:700;">${overallStatus}</span></div>
+            <div class="meta-item"><span class="meta-label">Model:</span> gemini-2.5-flash</div>
+            <div class="meta-item"><span class="meta-label">Report Date:</span> ${new Date().toLocaleDateString('en-AU', {day:'2-digit',month:'short',year:'numeric'})}</div>
+            <div class="meta-item"><span class="meta-label">Confidence:</span> ${Object.entries(confGroups).map(([k,v]) => `${k} (${v})`).join(', ')}</div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-grid">
+        <div class="card total">
+            <div class="card-value">${total}</div>
+            <div class="card-label">Total Assets</div>
+        </div>
+        <div class="card verified">
+            <div class="card-value">${verified}</div>
+            <div class="card-label">Verified</div>
+        </div>
+        <div class="card missing">
+            <div class="card-value">${missing}</div>
+            <div class="card-label">Missing on Drawing</div>
+        </div>
+        <div class="card rate">
+            <div class="card-value">${rate}%</div>
+            <div class="card-label">Verification Rate</div>
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="section progress-section">
+        <h2>Overall Verification Progress</h2>
+        <div class="progress-bar-bg">
+            <div class="progress-bar-fill ${progressClass}" style="width:${rate}%">${rate}%</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:12px;color:#666;">
+            <span>${verified} verified</span>
+            ${missing > 0 ? `<span style="color:#ef4444;">${missing} missing</span>` : ''}
+            ${mismatch > 0 ? `<span style="color:#f59e0b;">${mismatch} mismatch</span>` : ''}
+        </div>
+    </div>
+
+    <!-- Breakdown by Type -->
+    <div class="section">
+        <h2>Breakdown by Asset Type</h2>
+        <div class="breakdown-grid">
+            ${Object.entries(typeGroups).map(([type, counts]) => {
+                const iconClass = type.toLowerCase().includes('substation') ? 'substation' :
+                                  type.toLowerCase().includes('column') ? 'column' : 'pillar';
+                const initial = type.split(' ').pop()[0];
+                const pct = ((counts.verified / counts.total) * 100).toFixed(0);
+                const barColor = pct == 100 ? '#10b981' : pct >= 70 ? '#f59e0b' : '#ef4444';
+                return `
+                <div class="breakdown-item">
+                    <div class="breakdown-icon ${iconClass}">${initial}</div>
+                    <div class="breakdown-info">
+                        <div class="breakdown-type">${type}</div>
+                        <div class="breakdown-count">${counts.verified}/${counts.total} verified${counts.missing > 0 ? ` &middot; ${counts.missing} missing` : ''}</div>
+                        <div class="breakdown-bar"><div class="breakdown-bar-fill" style="width:${pct}%;background:${barColor};"></div></div>
+                    </div>
+                </div>`;
+            }).join('')}
+        </div>
+    </div>
+
+    <!-- Asset Details with Tabs -->
+    <div class="section">
+        <h2>Asset Details</h2>
+        <div class="tabs">
+            <button class="tab active" data-tab="all">All Assets (${total})</button>
+            <button class="tab" data-tab="verified">Verified (${verified})</button>
+            <button class="tab" data-tab="missing">Missing (${missing})</button>
+        </div>
+
+        <div class="tab-content active" id="tab-all">
+            ${renderTable(assets)}
+        </div>
+        <div class="tab-content" id="tab-verified">
+            ${verified > 0 ? renderTable(assets.filter(a => a.status === 'VERIFIED')) :
+              '<div class="empty-state"><div class="icon">&#128269;</div><p>No verified assets</p></div>'}
+        </div>
+        <div class="tab-content" id="tab-missing">
+            ${missing > 0 ? renderTable(assets.filter(a => a.status === 'MISSING_ON_DRAWING')) :
+              '<div class="empty-state"><div class="icon">&#10003;</div><p>No missing assets - all assets verified!</p></div>'}
+        </div>
+    </div>`;
+
+    // Missing Assets Spotlight (if any)
+    if (missing > 0) {
+        const missingAssets = assets.filter(a => a.status === 'MISSING_ON_DRAWING');
+        html += `
+        <div class="section" style="border-left: 4px solid #ef4444;">
+            <h2 style="color:#ef4444;">Missing Assets - Action Required</h2>
+            <p style="color:#666;margin-bottom:16px;font-size:14px;">The following assets were listed in the asset register but could not be found on the P&amp;ID drawing.</p>
+            <div class="table-wrapper">
+                <table>
+                    <thead><tr><th>Asset Number</th><th>Asset Type</th><th>Expected Symbol</th><th>Confidence</th></tr></thead>
+                    <tbody>
+                    ${missingAssets.map(a => `
+                        <tr>
+                            <td><strong>${esc(a.asset_number)}</strong></td>
+                            <td>${esc(a.asset_type)}</td>
+                            <td>${esc(a.expected_icon_description)}</td>
+                            <td><span class="badge badge-${a.confidence.toLowerCase()}">${esc(a.confidence)}</span></td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+    }
+
+    // Test Results
+    if (currentTestReport && currentTestReport.test_cases) {
+        const ts = currentTestReport.test_run_summary || {};
+        html += `
+        <div class="section">
+            <h2>Validation Test Results</h2>
+            <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;">
+                <div style="padding:8px 16px;background:${ts.overall_result === 'PASS' ? '#d1fae5' : '#fee2e2'};border-radius:8px;font-weight:600;font-size:14px;color:${ts.overall_result === 'PASS' ? '#065f46' : '#991b1b'}">
+                    Overall: ${ts.overall_result || 'N/A'}
+                </div>
+                <div style="padding:8px 16px;background:#f0f2f5;border-radius:8px;font-size:14px;">
+                    Score: <strong>${ts.score || 'N/A'}%</strong>
+                </div>
+                <div style="padding:8px 16px;background:#f0f2f5;border-radius:8px;font-size:14px;">
+                    ${ts.passed || 0}/${ts.total_tests || 0} tests passed
+                </div>
+            </div>
+            ${ts.summary ? `<p style="color:#666;font-size:14px;margin-bottom:16px;">${esc(ts.summary)}</p>` : ''}
+            <div class="test-grid">
+                ${currentTestReport.test_cases.map(tc => `
+                <div class="test-item">
+                    <div class="test-icon ${tc.result === 'PASS' ? 'pass' : 'fail'}">
+                        ${tc.result === 'PASS' ? '&#10003;' : '&#10007;'}
+                    </div>
+                    <div class="test-info">
+                        <div class="test-name">${esc(tc.test_id)} - ${esc(tc.test_name)}</div>
+                        <div class="test-desc">${esc(tc.description)}</div>
+                    </div>
+                    <div class="test-result ${tc.result === 'PASS' ? 'pass' : 'fail'}">${tc.result}</div>
+                </div>`).join('')}
+            </div>
+        </div>`;
+    }
+
+    document.getElementById('reportContent').innerHTML = html;
+
+    // Tab event listeners
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+            this.classList.add('active');
+            document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+        });
+    });
+}
+
+function renderTable(items) {
+    return `
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Asset Number</th>
+                    <th>Asset Type</th>
+                    <th>Expected Symbol</th>
+                    <th>Observed Symbol</th>
+                    <th>Status</th>
+                    <th>Confidence</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${items.map((a, i) => `
+                <tr>
+                    <td style="color:#999;">${i + 1}</td>
+                    <td><strong>${esc(a.asset_number)}</strong></td>
+                    <td>${esc(a.asset_type)}</td>
+                    <td>${esc(a.expected_icon_description)}</td>
+                    <td>${esc(a.observed_symbol)}</td>
+                    <td><span class="badge badge-${a.status === 'VERIFIED' ? 'verified' : a.status === 'MISSING_ON_DRAWING' ? 'missing' : 'mismatch'}">${formatStatus(a.status)}</span></td>
+                    <td><span class="badge badge-${a.confidence.toLowerCase()}">${esc(a.confidence)}</span></td>
+                </tr>`).join('')}
+            </tbody>
+        </table>
+    </div>`;
+}
+
+function formatStatus(s) {
+    return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function esc(str) {
+    const d = document.createElement('div');
+    d.textContent = str || '';
+    return d.innerHTML;
+}
+
+// File loaders
+document.getElementById('verificationFile').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+        try {
+            currentVerification = JSON.parse(ev.target.result);
+            render();
+        } catch(err) { alert('Invalid JSON file: ' + err.message); }
+    };
+    reader.readAsText(file);
+});
+
+document.getElementById('testReportFile').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+        try {
+            currentTestReport = JSON.parse(ev.target.result);
+            render();
+        } catch(err) { alert('Invalid JSON file: ' + err.message); }
+    };
+    reader.readAsText(file);
+});
+
+// Initial render
+render();
+</script>
+</body>
+</html>

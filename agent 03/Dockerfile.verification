@@ -1,0 +1,18 @@
+# Dockerfile.verification
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements_verification.txt .
+RUN pip install --no-cache-dir -r requirements_verification.txt
+
+COPY verification_agent.py .
+
+EXPOSE 8086
+
+CMD ["uvicorn", "verification_agent:app", "--host", "0.0.0.0", "--port", "8086"]

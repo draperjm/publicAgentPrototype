@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+python-multipart
+python-dotenv
+# AI Providers
+openai
+anthropic
+google-generativeai
+# File Parsers
+pdfplumber
+pandas
+openpyxl
+python-docx

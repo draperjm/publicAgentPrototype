@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+openai
+pydantic
+python-dotenv
+typing
+requests
+python-multipart
+pandas
+openpyxl
+python-docx
