@@ -1,0 +1,44 @@
+{
+  "process_id": "proc-customer-connections-review",
+  "process_name": "Customer Connections Review Analysis",
+  "version": "1.0",
+  "description": "Four-task analysis process that cross-references the Design Brief, Site Plan drawing and enriched asset register to produce a structured Customer Connections Review Analysis Report.",
+
+  "tasks": [
+    {
+      "task_id": "task-funding-requirements",
+      "task_name": "Funding Requirements Consolidation",
+      "task_type": "extraction",
+      "description": "Consolidate all items under the Determination of Funding Requirements section of the Design Brief. Identify and list every funding item, cost component, capital contribution, contestable/non-contestable split, and any ancillary network costs. Group items by funding category and produce a structured funding details section.",
+      "primary_source": "design_brief",
+      "output_format": "{\"funding_details\": {\"total_capital_contribution\": \"string or null\", \"contestable_works\": [{\"item\": \"string\", \"description\": \"string\", \"amount\": \"string or null\"}], \"non_contestable_works\": [{\"item\": \"string\", \"description\": \"string\", \"amount\": \"string or null\"}], \"ancillary_costs\": [{\"item\": \"string\", \"description\": \"string\", \"amount\": \"string or null\"}], \"other_funding_items\": [{\"item\": \"string\", \"description\": \"string\", \"amount\": \"string or null\"}], \"notes\": [\"string\"]}}"
+    },
+    {
+      "task_id": "task-supply-scope-comparison",
+      "task_name": "Method of Supply Scope Comparison",
+      "task_type": "comparison",
+      "description": "Compare the method of supply requirements described in the Design Brief against what is shown on the Site Plan drawing. Identify any scope items stated in the Design Brief that are absent or insufficiently represented in the Site Plan. List each missing or incomplete item with its source reference from the Design Brief and a brief note on what is absent from the Site Plan.",
+      "primary_source": "design_brief",
+      "secondary_source": "site_plan",
+      "output_format": "{\"method_of_supply_comparison\": {\"design_brief_requirements\": [\"string\"], \"site_plan_scope_found\": [\"string\"], \"missing_from_site_plan\": [{\"item\": \"string\", \"design_brief_reference\": \"string\", \"note\": \"string\"}], \"summary\": \"string\"}}"
+    },
+    {
+      "task_id": "task-funding-arrangement-comparison",
+      "task_name": "Funding Arrangement Scope Comparison",
+      "task_type": "comparison",
+      "description": "Compare the funding arrangement (works scope) described in the Design Brief against what is depicted in the Design Drawing (site plan). For each funded work item in the Design Brief, check whether a corresponding element exists in the drawing. List any items whose scope is missing or not accounted for in the drawing, with a brief note explaining the gap.",
+      "primary_source": "design_brief",
+      "secondary_source": "site_plan",
+      "output_format": "{\"funding_arrangement_comparison\": {\"design_brief_funded_works\": [\"string\"], \"drawing_scope_found\": [\"string\"], \"missing_from_drawing\": [{\"item\": \"string\", \"design_brief_reference\": \"string\", \"note\": \"string\"}], \"summary\": \"string\"}}"
+    },
+    {
+      "task_id": "task-asset-register",
+      "task_name": "Asset Register Summary",
+      "task_type": "summary",
+      "description": "Produce a complete asset register table. For each asset in the enriched asset list, record: asset_id, asset_type, description, the matched legend label (e.g. NEW POLE, EXISTING POLE, REMOVE POLE, NEW SL LANTERN), legend_category (cable/equipment), match_confidence (high/medium/low/none), and found_on_diagram (true/false based on match_confidence being high or medium). Derive the action_status from the legend label: labels containing 'NEW' map to 'new', 'REMOVE' maps to 'remove', 'REPLACE' maps to 'replace', 'EXISTING' maps to 'existing', anything else maps to 'unknown'.",
+      "primary_source": "enriched_assets",
+      "secondary_source": "legend_entries",
+      "output_format": "{\"asset_register\": [{\"asset_id\": \"string\", \"asset_type\": \"string\", \"description\": \"string\", \"legend_label\": \"string or null\", \"legend_category\": \"string or null\", \"action_status\": \"new|remove|replace|existing|unknown\", \"match_confidence\": \"high|medium|low|none\", \"found_on_diagram\": true}], \"register_summary\": {\"total\": 0, \"new\": 0, \"remove\": 0, \"replace\": 0, \"existing\": 0, \"found_on_diagram\": 0, \"not_found\": 0}}"
+    }
+  ]
+}

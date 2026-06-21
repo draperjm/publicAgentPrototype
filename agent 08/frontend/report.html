@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Application Review Report</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%22 height=%2232%22 rx=%226%22 fill=%22%23161616%22/%3E%3Crect x=%228%22 y=%2210%22 width=%2216%22 height=%2212%22 rx=%223%22 fill=%22none%22 stroke=%22%234d9fff%22 stroke-width=%222%22/%3E%3Ccircle cx=%2212%22 cy=%2216%22 r=%221.5%22 fill=%22%234d9fff%22/%3E%3Ccircle cx=%2220%22 cy=%2216%22 r=%221.5%22 fill=%22%234d9fff%22/%3E%3Crect x=%2214%22 y=%227%22 width=%224%22 height=%223%22 rx=%221%22 fill=%22%234d9fff%22/%3E%3C/svg%3E">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f3f8; color: #1a1f36; min-height: 100vh; }
+
+    /* ── NAV ── */
+    .topnav { background: #0f1628; padding: 0 24px; display: flex; align-items: center; gap: 8px; height: 48px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+    .topnav-brand { font-size: 0.82rem; font-weight: 700; color: #4d9fff; margin-right: 8px; }
+    .topnav a { color: rgba(255,255,255,0.5); text-decoration: none; font-size: 0.78rem; padding: 5px 10px; border-radius: 5px; transition: background .15s, color .15s; }
+    .topnav a:hover { background: rgba(255,255,255,0.07); color: #fff; }
+    .topnav a.active { background: rgba(77,159,255,0.15); color: #4d9fff; }
+
+    /* ── PAGE HEADER ── */
+    .page-header { background: linear-gradient(135deg, #0f1628 0%, #1a2744 100%); color: white; padding: 28px 32px 24px; }
+    .page-header h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 3px; }
+    .page-header .sub { font-size: 0.82rem; opacity: 0.6; margin-bottom: 16px; }
+    .report-selector { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .report-selector label { font-size: 0.78rem; opacity: 0.7; }
+    .report-selector select { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); color: white; padding: 7px 12px; border-radius: 6px; font-size: 0.82rem; cursor: pointer; min-width: 280px; outline: none; }
+    .report-selector select option { background: #1a2744; }
+    .btn-load { background: #2563eb; color: white; border: none; padding: 7px 16px; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: background .15s; }
+    .btn-load:hover { background: #1d4ed8; }
+    .btn-load:disabled { opacity: 0.45; cursor: not-allowed; }
+    .meta-pills { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+    .meta-pill { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.14); border-radius: 20px; padding: 4px 12px; font-size: 0.75rem; opacity: 0.85; }
+    .meta-pill b { opacity: 1; }
+
+    /* ── MAIN ── */
+    .main { max-width: 1360px; margin: 0 auto; padding: 28px 24px 60px; }
+
+    /* ── EMPTY / LOADING ── */
+    .empty-state { text-align: center; padding: 80px 24px; color: #6b7280; }
+    .empty-state .icon { font-size: 3.5rem; margin-bottom: 14px; }
+    .empty-state h2 { font-size: 1.1rem; color: #374151; margin-bottom: 6px; }
+    .empty-state p { font-size: 0.85rem; }
+    .spinner { text-align: center; padding: 60px; color: #6b7280; font-size: 0.85rem; }
+    .spinner::before { content: ''; display: block; width: 32px; height: 32px; border: 3px solid #e5e7eb; border-top-color: #2563eb; border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 14px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── SUMMARY CARDS ── */
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 28px; }
+    .stat-card { background: white; border-radius: 10px; padding: 18px 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    .stat-value { font-size: 2rem; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+    .stat-label { font-size: 0.7rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
+    .stat-card.blue   .stat-value { color: #1d4ed8; }
+    .stat-card.teal   .stat-value { color: #0f766e; }
+    .stat-card.amber  .stat-value { color: #b45309; }
+    .stat-card.violet .stat-value { color: #6d28d9; }
+
+    /* ── DOCUMENT INDEX ── */
+    .doc-index { background: white; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); margin-bottom: 28px; overflow: hidden; }
+    .doc-index-hdr { display: flex; align-items: center; gap: 10px; padding: 14px 20px; background: #1e293b; color: white; }
+    .doc-index-hdr-icon { font-size: 1.1rem; }
+    .doc-index-hdr-title { font-size: 0.9rem; font-weight: 700; flex: 1; }
+    .doc-index-table { width: 100%; border-collapse: collapse; }
+    .doc-index-table th { text-align: left; padding: 8px 16px; font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; border-bottom: 2px solid #e5e7eb; background: #f8fafc; }
+    .doc-index-table td { padding: 10px 16px; border-bottom: 1px solid #f0f0f0; font-size: 0.8rem; vertical-align: middle; }
+    .doc-index-table tr:last-child td { border-bottom: none; }
+    .doc-index-table tr:hover td { background: #f9fafb; }
+    .doc-index-filename { font-weight: 600; color: #1a1f36; display: flex; align-items: center; gap: 6px; }
+    .doc-index-filename .file-icon { font-size: 0.9rem; }
+    .tag-db { display: inline-flex; align-items: center; gap: 5px; background: #dbeafe; color: #1e40af; border-radius: 20px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
+    .tag-sp { display: inline-flex; align-items: center; gap: 5px; background: #d1fae5; color: #065f46; border-radius: 20px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
+    .tag-unknown { display: inline-flex; align-items: center; gap: 5px; background: #f3f4f6; color: #6b7280; border-radius: 20px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
+    .doc-type-pill { background: #f3f4f6; color: #374151; border-radius: 4px; padding: 2px 8px; font-size: 0.7rem; }
+
+    /* ── PROCESS SECTION ── */
+    .process-section { margin-bottom: 36px; }
+    .process-hdr { display: flex; align-items: center; gap: 12px; padding: 16px 22px; border-radius: 10px 10px 0 0; color: white; }
+    .process-hdr-icon { font-size: 1.3rem; }
+    .process-hdr-text { flex: 1; }
+    .process-hdr-title { font-size: 1rem; font-weight: 700; }
+    .process-hdr-summary { font-size: 0.75rem; opacity: 0.75; margin-top: 2px; }
+    .process-hdr-count { background: rgba(255,255,255,0.18); border-radius: 12px; padding: 3px 12px; font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
+
+    /* ── DOCUMENT TABS ── */
+    .doc-tabs { display: flex; gap: 0; background: white; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; overflow-x: auto; scrollbar-width: none; }
+    .doc-tabs::-webkit-scrollbar { display: none; }
+    .doc-tab { flex-shrink: 0; padding: 10px 18px; font-size: 0.78rem; cursor: pointer; border-bottom: 2px solid transparent; color: #6b7280; white-space: nowrap; transition: color .15s, border-color .15s; }
+    .doc-tab:hover { color: #374151; }
+
+    /* ── DOC PANEL ── */
+    .doc-panel { background: white; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px; display: none; }
+    .doc-panel.active { display: block; }
+    .doc-meta-bar { padding: 10px 20px; background: #f8fafc; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .doc-filename { font-size: 0.82rem; font-weight: 600; color: #1a1f36; }
+    .badge { font-size: 0.67rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; white-space: nowrap; }
+    .badge-type    { background: #e0e7ff; color: #3730a3; }
+    .badge-quality { background: #f0fdf4; color: #166534; }
+    .badge-sparse  { background: #fef9c3; color: #854d0e; }
+    .doc-sections-count { margin-left: auto; font-size: 0.72rem; color: #9ca3af; }
+
+    /* ── PROCESS STEPS WITHIN DOC ── */
+    .proc-step-group { border-bottom: 1px solid #f0f0f0; }
+    .proc-step-group:last-child { border-bottom: none; }
+    .proc-step-group-hdr {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 20px;
+      background: #f8fafc;
+      font-size: 0.75rem; font-weight: 700; color: #374151;
+      border-bottom: 1px solid #e5e7eb;
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .proc-step-group-hdr .step-num-badge {
+      background: #e5e7eb; color: #374151;
+      border-radius: 20px; padding: 1px 8px; font-size: 0.68rem; font-weight: 700;
+    }
+
+    /* ── SUB-STEP GRID ── */
+    .substep-grid { padding: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+
+    /* ── SUB-STEP BLOCK ── */
+    .substep-block { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+    .substep-block-hdr { padding: 10px 14px 8px; color: white; }
+    .substep-hdr-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .substep-icon { font-size: 1rem; }
+    .substep-title { font-size: 0.82rem; font-weight: 700; flex: 1; }
+    .substep-item-count { background: rgba(255,255,255,0.2); border-radius: 8px; padding: 1px 7px; font-size: 0.67rem; font-weight: 700; }
+    .substep-detail { font-size: 0.7rem; opacity: 0.8; line-height: 1.35; max-width: 100%; }
+
+    /* Guide (instructional steps) */
+    .guide-toggle { margin-top: 6px; font-size: 0.67rem; opacity: 0.75; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; border: none; background: rgba(255,255,255,0.15); color: white; padding: 2px 8px; border-radius: 10px; }
+    .guide-toggle:hover { background: rgba(255,255,255,0.25); }
+    .guide-panel { display: none; background: rgba(0,0,0,0.15); padding: 8px 12px; margin-top: 6px; border-radius: 6px; }
+    .guide-panel.open { display: block; }
+    .guide-step { font-size: 0.68rem; color: rgba(255,255,255,0.85); padding: 3px 0; display: flex; gap: 6px; line-height: 1.3; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .guide-step:last-child { border-bottom: none; }
+    .guide-step-num { opacity: 0.6; flex-shrink: 0; font-weight: 700; }
+
+    /* Body */
+    .substep-body { padding: 12px 14px; background: #fafafa; }
+    .substep-empty { font-size: 0.75rem; color: #9ca3af; font-style: italic; }
+
+    /* Field group */
+    .field-group { margin-bottom: 10px; }
+    .field-group:last-child { margin-bottom: 0; }
+    .field-group-label { font-size: 0.67rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; margin-bottom: 4px; }
+
+    /* Item row */
+    .item-row { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 0.78rem; }
+    .item-row:last-child { border-bottom: none; }
+    .item-dot { width: 5px; height: 5px; border-radius: 50%; background: #d1d5db; margin-top: 5px; flex-shrink: 0; }
+    .item-desc { flex: 1; color: #374151; line-height: 1.4; }
+    .item-src { flex-shrink: 0; display: flex; align-items: center; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+    .src-section { font-size: 0.63rem; background: #f3f4f6; color: #6b7280; border-radius: 4px; padding: 1px 5px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .src-page { font-size: 0.63rem; background: #dbeafe; color: #1e40af; border-radius: 4px; padding: 1px 5px; font-weight: 700; white-space: nowrap; }
+
+    /* Override notice */
+    .override-notice { display: flex; gap: 8px; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px; padding: 8px 12px; font-size: 0.75rem; color: #78350f; margin-bottom: 8px; }
+    .override-icon { font-size: 1rem; flex-shrink: 0; }
+
+    /* Funding table */
+    .funding-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+    .funding-table th { text-align: left; padding: 5px 8px; font-size: 0.63rem; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; border-bottom: 2px solid #e5e7eb; }
+    .funding-table td { padding: 7px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+    .funding-table tr:last-child td { border-bottom: none; }
+    .cat-badge { display: inline-block; font-size: 0.63rem; font-weight: 700; padding: 2px 7px; border-radius: 8px; white-space: nowrap; }
+    .cat-capital     { background: #dbeafe; color: #1e40af; }
+    .cat-non-contest { background: #fef3c7; color: #92400e; }
+    .cat-contestable { background: #dcfce7; color: #166534; }
+    .cat-other       { background: #f3f4f6; color: #374151; }
+    .party-badge { font-size: 0.63rem; padding: 2px 7px; border-radius: 8px; background: #f3f4f6; color: #374151; }
+
+    /* ── STATUS PILLS ── */
+    .status-pill { display: inline-block; font-size: 0.78rem; font-weight: 600; padding: 5px 12px; border-radius: 20px; margin: 2px 0 6px; }
+    .status-notfound  { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .status-required  { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+    .status-yes  { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .status-no   { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+    /* ── NOTES BLOCK ── */
+    .notes-block { font-size: 0.78rem; color: #374151; line-height: 1.55; }
+    .note-line { padding: 3px 0 3px 6px; border-bottom: 1px solid #f0f0f0; }
+    .note-line:last-child { border-bottom: none; }
+
+    /* ── LEGEND TABLE ── */
+    .legend-wrap { display: flex; flex-direction: column; gap: 16px; }
+    .legend-group { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+    .legend-group-hdr { padding: 7px 14px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px; }
+    .legend-group-count { opacity: 0.65; font-weight: 500; }
+    .legend-entry { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; padding: 7px 14px; border-bottom: 1px solid #f0f0f0; font-size: 0.78rem; }
+    .legend-entry:last-child { border-bottom: none; }
+    .legend-sym { color: #6b7280; font-style: italic; font-size: 0.72rem; line-height: 1.3; }
+    .legend-lbl { font-weight: 600; color: #1a1f36; }
+    .legend-full { grid-template-columns: 1fr; }
+    .legend-section-header { padding: 18px 22px 8px; font-size: 0.9rem; font-weight: 700; color: #1a1f36; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 8px; }
+
+    /* ── ASSET TABLE ── */
+    .asset-count-bar { font-size: 0.75rem; color: #6b7280; padding: 6px 0 10px; }
+    .asset-count-bar b { color: #1a1f36; }
+    .asset-table-wrap { overflow-x: auto; max-height: 400px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; }
+    .asset-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+    .asset-table th { position: sticky; top: 0; background: #f8fafc; text-align: left; padding: 6px 10px; font-size: 0.63rem; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; border-bottom: 2px solid #e5e7eb; white-space: nowrap; z-index: 1; }
+    .asset-table td { padding: 6px 10px; border-bottom: 1px solid #f5f5f5; vertical-align: top; color: #374151; white-space: nowrap; }
+    .asset-table tr:last-child td { border-bottom: none; }
+    .asset-table tr:hover td { background: #f9fafb; }
+    .asset-id-cell { font-family: monospace; font-size: 0.7rem; color: #4338ca; }
+    .asset-section-full { background: white; border: 1px solid #e5e7eb; border-radius: 0 0 10px 10px; padding: 20px; }
+    .asset-match-table { width: 100%; border-collapse: collapse; font-size: 0.74rem; }
+    .asset-match-table th { background: #f8fafc; text-align: left; padding: 6px 10px; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; border-bottom: 2px solid #e5e7eb; white-space: nowrap; }
+    .asset-match-table td { padding: 5px 10px; border-bottom: 1px solid #f5f5f5; vertical-align: top; color: #374151; }
+    .asset-match-table tr:last-child td { border-bottom: none; }
+    .asset-match-table tr.match-found td { background: #f0fdf4; }
+    .asset-match-table tr.match-not-found td { background: #fff; }
+    .asset-match-table tr:hover td { filter: brightness(0.97); }
+    .asset-id-code { font-family: monospace; font-size: 0.72rem; background: #f1f5f9; padding: 1px 5px; border-radius: 3px; }
+    .match-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; white-space: nowrap; }
+    .match-badge.match-found { background: #dcfce7; color: #166534; }
+    .match-badge.match-not-found { background: #fee2e2; color: #991b1b; }
+    .sheets-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+    .sheet-pill { background: #e0e7ff; color: #3730a3; font-size: 0.7rem; font-weight: 700; padding: 3px 10px; border-radius: 12px; }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <span class="topnav-brand">AI Agent</span>
+  <a href="/index.html">Workflow</a>
+  <a href="/extractions.html">Extractions</a>
+  <a href="/processes.html">Processes</a>
+  <a href="/validation_report.html">Validation</a>
+  <a href="/report.html" class="active">Reports</a>
+</nav>
+
+<div class="page-header">
+  <h1>Customer Connections Application Review</h1>
+  <p class="sub">Consolidated extraction report — aligned to process definitions</p>
+  <div class="report-selector">
+    <label>Report file</label>
+    <select id="reportSelect"><option value="">Loading…</option></select>
+    <button class="btn-load" id="loadBtn" onclick="loadReport()" disabled>Load Report</button>
+  </div>
+  <div class="meta-pills" id="metaPills" style="display:none"></div>
+</div>
+
+<div class="main">
+  <div id="reportContent">
+    <div class="empty-state">
+      <div class="icon">📋</div>
+      <h2>No report loaded</h2>
+      <p>Select a consolidated report file above and click Load Report.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+// Populated from the process JSON files via API
+let PROC_DEFS = {
+  db: { processName: 'Design Brief Review', steps: [], subStepMap: {} },
+  sp: { processName: 'Site Plan Review',    steps: [], subStepMap: {} },
+};
+
+// ── Icon / colour helpers (by sub-step keyword) ───────────────────────────────
+function iconFor(id) {
+  const s = (id || '').toLowerCase();
+  if (s.includes('-hv'))           return '⚡';
+  if (s.includes('-lv'))           return '🔌';
+  if (s.includes('-sl') || s.includes('street')) return '💡';
+  if (s.includes('earthing'))      return '⏚';
+  if (s.includes('easement'))      return '📐';
+  if (s.includes('substation'))    return '🏗';
+  if (s.includes('funding') || s.includes('ancillary') || s.includes('payment')) return '💰';
+  if (s.includes('transformer'))   return '⚙️';
+  if (s.includes('hv-switchgear')) return '⚡';
+  if (s.includes('voltage'))       return '📊';
+  if (s.includes('lv-switchgear')) return '🔌';
+  if (s.includes('cubicle'))       return '📦';
+  return '•';
+}
+function colorFor(id) {
+  const s = (id || '').toLowerCase();
+  // Design brief
+  if (s.includes('sub-step-extract-hv'))         return '#1e3a8a';
+  if (s.includes('sub-step-extract-lv'))         return '#1d4ed8';
+  if (s.includes('sub-step-extract-sl'))         return '#6d28d9';
+  if (s.includes('sub-step-extract-earthing'))   return '#065f46';
+  if (s.includes('sub-step-extract-easement'))   return '#7c2d12';
+  if (s.includes('sub-step-extract-substation')) return '#3730a3';
+  if (s.includes('funding') || s.includes('ancillary') || s.includes('payment')) return '#92400e';
+  // Site plan
+  if (s.includes('siteplan-substation'))  return '#134e4a';
+  if (s.includes('transformer'))          return '#0f766e';
+  if (s.includes('hv-switchgear'))        return '#0e7490';
+  if (s.includes('voltage'))              return '#0369a1';
+  if (s.includes('lv-switchgear'))        return '#4338ca';
+  if (s.includes('cubicle'))              return '#6d28d9';
+  if (s.includes('siteplan-earthing'))    return '#064e3b';
+  return '#374151';
+}
+
+// ── Load process definitions from API ─────────────────────────────────────────
+async function loadProcessDefs() {
+  const endpoints = {
+    db: '/api/orchestrator/process/proc-extract-design-brief-info',
+    sp: '/api/orchestrator/process/proc-extract-site-plan-info',
+  };
+  await Promise.all(Object.entries(endpoints).map(async ([key, url]) => {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return;
+      const proc = await r.json();
+      PROC_DEFS[key].processName = proc.process_name || PROC_DEFS[key].processName;
+      PROC_DEFS[key].steps = proc.steps || [];
+      // Build flat sub-step map across all steps
+      (proc.steps || []).forEach(step => {
+        (step.sub_steps || []).forEach((ss, order) => {
+          PROC_DEFS[key].subStepMap[ss.sub_step_id] = {
+            id:           ss.sub_step_id,
+            label:        ss.sub_step_name,
+            details:      ss.details || '',
+            guide:        ss.instructional_sub_steps || [],
+            stepNumber:   step.step_number,
+            stepName:     step.step_name,
+            order,
+            icon:         iconFor(ss.sub_step_id),
+            color:        colorFor(ss.sub_step_id),
+            isFunding:    (ss.sub_step_id || '').toLowerCase().includes('funding')
+                          || (ss.sub_step_id || '').toLowerCase().includes('ancillary')
+                          || (ss.sub_step_id || '').toLowerCase().includes('payment'),
+          };
+        });
+      });
+    } catch (_) {}
+  }));
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtKey(k) { return k.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()); }
+function fmtDate(iso) {
+  try { return new Date(iso).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}); }
+  catch { return iso; }
+}
+function catClass(cat) {
+  const c = (cat||'').toLowerCase();
+  if (c.includes('capital'))   return 'cat-capital';
+  if (c.includes('non'))       return 'cat-non-contest';
+  if (c.includes('contestable')) return 'cat-contestable';
+  return 'cat-other';
+}
+
+// ── Item renderers ─────────────────────────────────────────────────────────────
+function srcBadges(it) {
+  const sec  = it.source_section ? `<span class="src-section" title="${esc(it.source_section)}">${esc(it.source_section)}</span>` : '';
+  const page = (it.source_page != null && it.source_page !== 'N/A')
+               ? `<span class="src-page">p.${esc(it.source_page)}</span>` : '';
+  return (sec || page) ? `<div class="item-src">${sec}${page}</div>` : '';
+}
+
+function renderItemList(items) {
+  if (!Array.isArray(items) || !items.length) return '';
+  return items.map(it => `
+    <div class="item-row">
+      <div class="item-dot"></div>
+      <div class="item-desc">${esc(it.description || it.item_description || JSON.stringify(it))}</div>
+      ${srcBadges(it)}
+    </div>`).join('');
+}
+
+function renderFundingTable(items) {
+  if (!Array.isArray(items) || !items.length)
+    return '<p class="substep-empty">No funding items found.</p>';
+  return `<table class="funding-table">
+    <thead><tr><th>Item</th><th>Category</th><th>Party</th><th>Amount</th></tr></thead>
+    <tbody>${items.map(it => `<tr>
+      <td>${esc(it.item_description || it.description || '—')}</td>
+      <td><span class="cat-badge ${catClass(it.funding_category)}">${esc(it.funding_category||'—')}</span></td>
+      <td><span class="party-badge">${esc(it.responsible_party||'—')}</span></td>
+      <td>${esc(it.amount_or_formula || it.amount || '—')}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+// Render a status string as a coloured pill (NOT FOUND, YES, NOT REQUIRED, etc.)
+// Returns null if the string is not a known status value.
+function renderStatusPill(v) {
+  const u = v.trim().toUpperCase();
+  if (u.startsWith('NOT FOUND') || u.startsWith('NOT COMPLETED') || u === 'NONE')
+    return `<div class="status-pill status-notfound">${esc(v)}</div>`;
+  if (u === 'NOT REQUIRED' || u === 'N/A')
+    return `<div class="status-pill status-required">${esc(v)}</div>`;
+  if (/^YES\b/.test(u))
+    return `<div class="status-pill status-yes">${esc(v)}</div>`;
+  if (/^NO\b/.test(u) || /^NO —/.test(u))
+    return `<div class="status-pill status-no">${esc(v)}</div>`;
+  return null;
+}
+
+// Render multi-line text (notes / free-text extractions)
+function renderNotesBlock(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  return `<div class="notes-block">${lines.map(l => `<div class="note-line">${esc(l)}</div>`).join('')}</div>`;
+}
+
+// Render drawing legend entries grouped by category
+function renderLegendEntries(entries) {
+  if (!entries.length) return '<p class="substep-empty">No legend entries.</p>';
+  const CAT = {
+    cable:      { bg:'#dbeafe', color:'#1e40af', icon:'〰' },
+    equipment:  { bg:'#d1fae5', color:'#065f46', icon:'⚙' },
+    substation: { bg:'#ede9fe', color:'#5b21b6', icon:'⚡' },
+    boundary:   { bg:'#fef3c7', color:'#92400e', icon:'▭' },
+    annotation: { bg:'#fce7f3', color:'#831843', icon:'✏' },
+    earthing:   { bg:'#ecfdf5', color:'#064e3b', icon:'⏚' },
+    other:      { bg:'#f3f4f6', color:'#374151', icon:'•'  },
+  };
+  const ORDER = ['cable','equipment','substation','boundary','annotation','earthing','other'];
+  const grouped = {};
+  entries.forEach(e => {
+    const cat = ((e.category||'other').toLowerCase().trim());
+    const key = CAT[cat] ? cat : 'other';
+    (grouped[key] = grouped[key] || []).push(e);
+  });
+  const cats = ORDER.filter(c => grouped[c]);
+  return `<div class="legend-wrap">${cats.map(cat => {
+    const items = grouped[cat], s = CAT[cat];
+    return `<div class="legend-group">
+      <div class="legend-group-hdr" style="background:${s.bg};color:${s.color}">
+        ${s.icon} ${cat.charAt(0).toUpperCase()+cat.slice(1)}
+        <span class="legend-group-count">${items.length} symbol${items.length!==1?'s':''}</span>
+      </div>
+      <div class="legend-entry" style="font-size:0.63rem;font-weight:700;color:#9ca3af;padding-bottom:2px;border-bottom:2px solid #e5e7eb">
+        <span>Symbol Description</span><span>Label</span>
+      </div>
+      ${items.map(e => `<div class="legend-entry">
+        <div class="legend-sym">${esc(e.symbol_description||'—')}</div>
+        <div class="legend-lbl">${esc(e.label||'—')}</div>
+      </div>`).join('')}
+    </div>`;
+  }).join('')}</div>`;
+}
+
+// Render asset records as a scrollable table
+function renderAssetTable(records, totalAssets, sheetsProcessed) {
+  const header = (totalAssets || records.length)
+    ? `<div class="asset-count-bar"><b>${totalAssets || records.length}</b> asset record${(totalAssets||records.length)!==1?'s':''} extracted
+       ${sheetsProcessed?.length ? ' from sheets: ' + sheetsProcessed.join(', ') : ''}</div>` : '';
+  if (!records.length) return header + '<p class="substep-empty">No asset records found.</p>';
+  const COLS = [
+    {key:'asset_id',      label:'Asset ID'},
+    {key:'asset_type',    label:'Type'},
+    {key:'description',   label:'Description'},
+    {key:'serial_number', label:'Serial No.'},
+    {key:'location',      label:'Location'},
+    {key:'address',       label:'Address'},
+  ];
+  const active = COLS.filter(c => records.some(r => r[c.key]));
+  return `${header}<div class="asset-table-wrap">
+    <table class="asset-table">
+      <thead><tr>${active.map(c => `<th>${esc(c.label)}</th>`).join('')}</tr></thead>
+      <tbody>${records.map(r => `<tr>${active.map(c =>
+        `<td${c.key==='asset_id'?' class="asset-id-cell"':''}>${esc(r[c.key]||'—')}</td>`
+      ).join('')}</tr>`).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+// Render a sub-step data value (handles arrays, objects, funding shapes)
+function renderSubStepBody(id, data, isFunding) {
+  if (data === null || data === undefined)
+    return '<p class="substep-empty">No data extracted.</p>';
+
+  // Check for HV override
+  function overrideHtml(obj) {
+    const v = obj?.HV_Switchgear || obj?.hv_switchgear || obj;
+    if (v?.hv_switchgear_override_applied) {
+      return `<div class="override-notice">
+        <span class="override-icon">⚠️</span>
+        <b>1.5MVA Rule applied</b> — ${esc(v.type||'')}${v.override_note ? ': ' + esc(v.override_note) : ''}
+      </div>`;
+    }
+    return '';
+  }
+
+  // ── Unwrap {value: ..., sub_step_name: ..., phase: ...} shape used by site-plan sub-steps ──
+  // These internal keys are display metadata, not content — skip them and render just `value`.
+  const INTERNAL_KEYS = new Set(['sub_step_name','phase','description_of_step','step_id']);
+  if (typeof data === 'object' && !Array.isArray(data) && 'value' in data) {
+    const v = data.value;
+    if (v === null || v === undefined || v === '')
+      return '<p class="substep-empty">No data extracted.</p>';
+    if (typeof v === 'string') {
+      const pill = renderStatusPill(v);
+      if (pill) return pill;
+      return v.includes('\n')
+        ? renderNotesBlock(v)
+        : `<div class="item-row"><div class="item-dot"></div><div class="item-desc">${esc(v)}</div></div>`;
+    }
+    if (Array.isArray(v)) {
+      if (!v.length) return '<p class="substep-empty">No items.</p>';
+      if (v[0]?.symbol_description !== undefined || (v[0]?.label !== undefined && v[0]?.page !== undefined))
+        return renderLegendEntries(v);
+      if (v[0]?.asset_id !== undefined) return renderAssetTable(v);
+      const hasFund = v.some(x => x?.funding_category);
+      return hasFund ? renderFundingTable(v) : renderItemList(v);
+    }
+    // value is an object — fall through to normal object rendering with the unwrapped value
+    data = v;
+  }
+
+  if (Array.isArray(data)) {
+    if (!data.length) return '<p class="substep-empty">No items found.</p>';
+    if (data[0]?.symbol_description !== undefined || (data[0]?.label !== undefined && data[0]?.page !== undefined))
+      return renderLegendEntries(data);
+    if (data[0]?.asset_id !== undefined) return renderAssetTable(data);
+    const hasFundingFields = data.some(x => x?.funding_category);
+    return hasFundingFields ? renderFundingTable(data) : renderItemList(data);
+  }
+
+  if (typeof data !== 'object') {
+    const pill = renderStatusPill(String(data));
+    if (pill) return pill;
+    return `<div class="item-row"><div class="item-dot"></div><div class="item-desc">${esc(String(data))}</div></div>`;
+  }
+
+  // Asset spreadsheet shape: {asset_records: [...], total_assets: N, sheets_processed: [...]}
+  if (data.asset_records) {
+    return renderAssetTable(data.asset_records, data.total_assets, data.sheets_processed);
+  }
+
+  // Funding object with `items`
+  if (isFunding && data.items) return renderFundingTable(data.items);
+  if (isFunding && data.ancillary_network_services_fees)
+    return renderFundingTable(data.ancillary_network_services_fees);
+
+  // General object: render each key
+  let html = overrideHtml(data);
+  let count = 0;
+
+  Object.entries(data).forEach(([k, v]) => {
+    const SKIP = new Set(['hv_switchgear_override_applied','override_note','HV_Switchgear','hv_switchgear']);
+    if (SKIP.has(k)) return;
+    if (v === null || v === undefined) return;
+
+    if (Array.isArray(v)) {
+      if (!v.length) return;
+      count += v.length;
+      const hasFund = v.some(x => x?.funding_category);
+      html += `<div class="field-group">
+        <div class="field-group-label">${esc(fmtKey(k))}</div>
+        ${hasFund ? renderFundingTable(v) : renderItemList(v)}
+      </div>`;
+    } else if (typeof v === 'object') {
+      // Skip duplicate "Consolidated_*" wrappers that repeat parent data
+      if (k.toLowerCase().startsWith('consolidated_')) return;
+      if (v.hv_switchgear_override_applied) return; // handled by overrideHtml
+      if (v.description != null) {
+        const isNa = String(v.description).toLowerCase().match(/^no .* found/);
+        if (isNa) return;
+        count++;
+        html += `<div class="field-group">
+          <div class="field-group-label">${esc(fmtKey(k))}</div>
+          <div class="item-row">
+            <div class="item-dot"></div>
+            <div class="item-desc">${esc(v.description)}</div>
+            ${srcBadges(v)}
+          </div>
+        </div>`;
+      } else {
+        // Nested object — render sub-keys
+        let sub = '';
+        Object.entries(v).forEach(([sk, sv]) => {
+          if (sk === 'hv_switchgear_override_applied' || sk === 'override_note') return;
+          if (Array.isArray(sv) && sv.length) {
+            count += sv.length;
+            sub += `<div class="field-group">
+              <div class="field-group-label" style="font-size:0.61rem">${esc(fmtKey(sk))}</div>
+              ${renderItemList(sv)}
+            </div>`;
+          } else if (sv && typeof sv === 'object' && sv.description) {
+            count++;
+            sub += `<div class="item-row">
+              <div class="item-dot"></div>
+              <div class="item-desc"><b>${esc(fmtKey(sk))}:</b> ${esc(sv.description)}</div>
+              ${srcBadges(sv)}
+            </div>`;
+          }
+        });
+        if (sub) {
+          html += `<div class="field-group">
+            <div class="field-group-label">${esc(fmtKey(k))}</div>${sub}
+          </div>`;
+        }
+      }
+    } else {
+      count++;
+      html += `<div class="item-row">
+        <div class="item-dot"></div>
+        <div class="item-desc"><b>${esc(fmtKey(k))}:</b> ${esc(String(v))}</div>
+      </div>`;
+    }
+  });
+
+  return html || '<p class="substep-empty">No items found.</p>';
+}
+
+// ── Build one sub-step block ──────────────────────────────────────────────────
+function buildSubStepBlock(ssId, data, procKey, blockIdx) {
+  const map  = PROC_DEFS[procKey].subStepMap;
+  const meta = map[ssId] || { label: fmtKey(ssId), details: '', guide: [], icon: '•', color: '#374151', isFunding: false };
+  const guideId = `guide-${procKey}-${blockIdx}`;
+
+  // Count items for the badge
+  function countItems(d) {
+    if (!d) return 0;
+    if (Array.isArray(d)) return d.length;
+    if (d.items) return d.items.length;
+    if (d.ancillary_network_services_fees) return d.ancillary_network_services_fees.length;
+    if (typeof d === 'object') {
+      let n = 0;
+      Object.values(d).forEach(v => {
+        if (Array.isArray(v)) n += v.length;
+        else if (v && typeof v === 'object') n += countItems(v);
+        else if (v != null) n++;
+      });
+      return n;
+    }
+    return 1;
+  }
+  const n = countItems(data);
+
+  const guideHtml = meta.guide.length ? `
+    <button class="guide-toggle" onclick="toggleGuide('${guideId}')">▸ Extraction guide (${meta.guide.length})</button>
+    <div class="guide-panel" id="${guideId}">
+      ${meta.guide.map((g, i) => `
+        <div class="guide-step">
+          <span class="guide-step-num">${i+1}.</span>
+          <span><b>${esc(g.title||'')}</b>${g.instructions ? ' — ' + esc(g.instructions) : ''}</span>
+        </div>`).join('')}
+    </div>` : '';
+
+  const detailHtml = meta.details
+    ? `<div class="substep-detail">${esc(meta.details)}</div>` : '';
+
+  return `<div class="substep-block">
+    <div class="substep-block-hdr" style="background:${esc(meta.color)}">
+      <div class="substep-hdr-top">
+        <span class="substep-icon">${meta.icon}</span>
+        <span class="substep-title">${esc(meta.label)}</span>
+        ${n > 0 ? `<span class="substep-item-count">${n}</span>` : ''}
+      </div>
+      ${detailHtml}
+      ${guideHtml}
+    </div>
+    <div class="substep-body">${renderSubStepBody(ssId, data, meta.isFunding)}</div>
+  </div>`;
+}
+
+function toggleGuide(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle('open');
+  const btn = el.previousElementSibling;
+  if (btn) btn.textContent = el.classList.contains('open')
+    ? btn.textContent.replace('▸','▾') : btn.textContent.replace('▾','▸');
+}
+
+// ── Order sub-steps by process definition ─────────────────────────────────────
+function orderedSubSteps(ssKeys, procKey) {
+  const map = PROC_DEFS[procKey].subStepMap;
+  return [...ssKeys].sort((a, b) => {
+    const ma = map[a], mb = map[b];
+    if (!ma && !mb) return 0;
+    if (!ma) return 1;
+    if (!mb) return -1;
+    if (ma.stepNumber !== mb.stepNumber) return ma.stepNumber - mb.stepNumber;
+    return ma.order - mb.order;
+  });
+}
+
+// Group sub-steps by their parent step from the process def
+function groupByProcStep(ssKeys, procKey) {
+  const map = PROC_DEFS[procKey].subStepMap;
+  const groups = {};  // stepNumber → { stepName, keys[] }
+  ssKeys.forEach(k => {
+    const m = map[k];
+    const sNum  = m ? m.stepNumber : 99;
+    const sName = m ? m.stepName   : 'Other';
+    if (!groups[sNum]) groups[sNum] = { stepName: sName, keys: [] };
+    groups[sNum].keys.push(k);
+  });
+  return Object.entries(groups).sort(([a],[b]) => Number(a)-Number(b));
+}
+
+// ── Build a document panel ─────────────────────────────────────────────────────
+let blockCounter = 0;
+function buildDocPanel(extraction, procKey, isActive) {
+  const substeps = extraction.sub_step_extractions || extraction.step_extraction || {};
+  const allKeys  = Object.keys(substeps);
+
+  // Filter to only sub-steps belonging to this process
+  const procMap = PROC_DEFS[procKey].subStepMap;
+  const relevantKeys = allKeys.filter(k => {
+    if (procMap[k]) return true;
+    // Fallback: site-plan keys contain "siteplan", design-brief don't
+    return procKey === 'sp' ? k.includes('siteplan') : !k.includes('siteplan');
+  });
+  const orderedKeys = orderedSubSteps(relevantKeys, procKey);
+  const groups      = groupByProcStep(orderedKeys, procKey);
+
+  const quality = extraction.document_quality || 'text';
+  const qCls    = quality === 'sparse' ? 'badge-sparse' : 'badge-quality';
+
+  const groupsHtml = groups.map(([stepNum, grp]) => {
+    const gridItems = grp.keys.map(k => {
+      blockCounter++;
+      return buildSubStepBlock(k, substeps[k], procKey, blockCounter);
+    }).join('');
+    // Only show step group header if there are multiple groups
+    const hdr = groups.length > 1 ? `
+      <div class="proc-step-group-hdr">
+        <span class="step-num-badge">Step ${stepNum}</span>
+        ${esc(grp.stepName)}
+      </div>` : '';
+    return `<div class="proc-step-group">
+      ${hdr}
+      <div class="substep-grid">${gridItems}</div>
+    </div>`;
+  }).join('');
+
+  return `<div class="doc-panel ${isActive?'active':''}">
+    <div class="doc-meta-bar">
+      <span class="doc-filename">${esc(extraction.filename||'—')}</span>
+      <span class="badge badge-type">${esc(extraction.document_type||'—')}</span>
+      <span class="badge ${qCls}">${esc(quality)}</span>
+      <span class="doc-sections-count">${extraction.relevant_sections||0}/${extraction.total_sections||0} sections matched</span>
+    </div>
+    ${groupsHtml || '<p style="padding:20px;color:#9ca3af;font-size:0.8rem">No sub-step data found.</p>'}
+  </div>`;
+}
+
+// ── Build a full process section (Design Brief or Site Plan) ──────────────────
+function buildProcessSection(extractions, procKey) {
+  const def   = PROC_DEFS[procKey];
+  const icon  = procKey === 'db' ? '📄' : '🗺️';
+  const hdrBg = procKey === 'db' ? '#1e3a8a' : '#134e4a';
+
+  // Count total findings
+  let total = 0;
+  extractions.forEach(ex => {
+    Object.values(ex.sub_step_extractions || ex.step_extraction || {}).forEach(d => {
+      if (Array.isArray(d)) total += d.length;
+      else if (d?.items) total += d.items.length;
+      else if (d && typeof d === 'object') {
+        Object.values(d).forEach(v => { if (Array.isArray(v)) total += v.length; });
+      }
+    });
+  });
+
+  const tabsHtml = extractions.map((ex, i) => {
+    const short = (ex.filename||'—').replace(/\.[^.]+$/,'').substring(0,38);
+    const activeTab = procKey === 'db' ? '#1d4ed8' : '#0f766e';
+    return `<div class="doc-tab" data-sec="${procKey}" data-idx="${i}"
+              onclick="switchTab('${procKey}',${i})">${esc(short)}</div>`;
+  }).join('');
+
+  const panelsHtml = extractions.map((ex, i) => buildDocPanel(ex, procKey, i===0)).join('');
+
+  return `<div class="process-section">
+    <div class="process-hdr" style="background:${hdrBg}">
+      <span class="process-hdr-icon">${icon}</span>
+      <div class="process-hdr-text">
+        <div class="process-hdr-title">${esc(def.processName)}</div>
+        <div class="process-hdr-summary">${extractions.length} document${extractions.length!==1?'s':''} processed</div>
+      </div>
+      <span class="process-hdr-count">${total} findings</span>
+    </div>
+    <div class="doc-tabs" id="tabs-${procKey}">${tabsHtml}</div>
+    <div id="panels-${procKey}">${panelsHtml}</div>
+  </div>`;
+}
+
+function switchTab(procKey, idx) {
+  document.querySelectorAll(`#panels-${procKey} .doc-panel`).forEach((p,i) => p.classList.toggle('active', i===idx));
+  document.querySelectorAll(`#tabs-${procKey} .doc-tab`).forEach((t,i) => {
+    const active = i === idx;
+    const col    = procKey === 'db' ? '#1d4ed8' : '#0f766e';
+    t.style.color       = active ? col   : '';
+    t.style.borderColor = active ? col   : 'transparent';
+    t.style.fontWeight  = active ? '600' : '';
+  });
+}
+
+// ── Build document index table ─────────────────────────────────────────────────
+function buildDocumentIndex(data) {
+  // Collect every file across all extraction steps
+  const rows = [];
+  Object.entries(data.source_extractions || {}).forEach(([stepKey, src]) => {
+    (src.extractions || []).forEach(ex => {
+      const procName = (ex.process_step_name || '').toLowerCase();
+      let tag, tagClass;
+      if (procName.includes('design brief')) {
+        tag = '📄 Design Brief';  tagClass = 'tag-db';
+      } else if (procName.includes('site plan')) {
+        tag = '🗺️ Site Plan';     tagClass = 'tag-sp';
+      } else {
+        // Fall back to sub-step key heuristic
+        const keys = Object.keys(ex.sub_step_extractions || ex.step_extraction || {});
+        if (keys.some(k => k.includes('siteplan'))) {
+          tag = '🗺️ Site Plan';   tagClass = 'tag-sp';
+        } else if (keys.length) {
+          tag = '📄 Design Brief'; tagClass = 'tag-db';
+        } else {
+          tag = 'Unknown';         tagClass = 'tag-unknown';
+        }
+      }
+      const ext = (ex.filename || '').split('.').pop().toLowerCase();
+      const fileIcon = ext === 'pdf' ? '📄' : ext === 'csv' ? '📊' : ext === 'dwg' ? '📐' : '📁';
+      rows.push({ filename: ex.filename || '—', fileIcon, docType: ex.document_type || '—', tag, tagClass });
+    });
+  });
+
+  if (!rows.length) return '';
+
+  const rowsHtml = rows.map(r => `
+    <tr>
+      <td><span class="doc-index-filename"><span class="file-icon">${r.fileIcon}</span>${esc(r.filename)}</span></td>
+      <td><span class="doc-type-pill">${esc(r.docType)}</span></td>
+      <td><span class="${r.tagClass}">${r.tag}</span></td>
+    </tr>`).join('');
+
+  return `<div class="doc-index">
+    <div class="doc-index-hdr">
+      <span class="doc-index-hdr-icon">🗂️</span>
+      <span class="doc-index-hdr-title">Document Assignments</span>
+      <span style="font-size:0.72rem;opacity:0.6">${rows.length} file${rows.length!==1?'s':''} processed</span>
+    </div>
+    <table class="doc-index-table">
+      <thead><tr><th>Filename</th><th>Document Type</th><th>Extraction Process</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+  </div>`;
+}
+
+// ── Build a drawing legend section ────────────────────────────────────────────
+function buildLegendSection(extractions) {
+  let allEntries = [];
+  extractions.forEach(ex => {
+    const sse = ex.sub_step_extractions || {};
+    Object.values(sse).forEach(v => {
+      const arr = Array.isArray(v) ? v : (v?.value && Array.isArray(v.value) ? v.value : null);
+      if (arr) allEntries = allEntries.concat(arr);
+    });
+  });
+  const fileName = extractions[0]?.filename || '';
+  return `<div class="process-section">
+    <div class="process-hdr" style="background:#1e3a5f">
+      <span class="process-hdr-icon">🗺</span>
+      <div class="process-hdr-text">
+        <div class="process-hdr-title">Drawing Legend</div>
+        <div class="process-hdr-summary">${esc(fileName)}</div>
+      </div>
+      <span class="process-hdr-count">${allEntries.length} symbol${allEntries.length!==1?'s':''}</span>
+    </div>
+    <div style="background:white;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;padding:20px;">
+      ${renderLegendEntries(allEntries)}
+    </div>
+  </div>`;
+}
+
+// ── Build an asset spreadsheet section ────────────────────────────────────────
+function buildAssetSection(extractions) {
+  const ex = extractions[0];
+  if (!ex) return '';
+  const se  = ex.step_extraction || ex.sub_step_extractions || {};
+  const records = se.asset_records || [];
+  const total   = se.total_assets;
+  const sheets  = se.sheets_processed || [];
+  return `<div class="process-section">
+    <div class="process-hdr" style="background:#166534">
+      <span class="process-hdr-icon">📊</span>
+      <div class="process-hdr-text">
+        <div class="process-hdr-title">Asset Register</div>
+        <div class="process-hdr-summary">${esc(ex.filename||'')} — ${esc(ex.document_type||'Spreadsheet')}</div>
+      </div>
+      <span class="process-hdr-count">${total||records.length} assets</span>
+    </div>
+    <div class="asset-section-full">
+      ${sheets.length ? `<div class="sheets-pills">${sheets.map(s => `<span class="sheet-pill">${esc(s)}</span>`).join('')}</div>` : ''}
+      ${renderAssetTable(records, total, sheets)}
+    </div>
+  </div>`;
+}
+
+// ── Collect legend entries from any extraction step ────────────────────────────
+function collectLegendEntries(data) {
+  const entries = [];
+  Object.values(data.source_extractions || {}).forEach(src => {
+    (src.extractions || []).forEach(ex => {
+      const sse = ex.sub_step_extractions || {};
+      Object.entries(sse).forEach(([k, v]) => {
+        if (!k.toLowerCase().includes('legend')) return;
+        const arr = Array.isArray(v) ? v
+                  : (v?.value && Array.isArray(v.value)) ? v.value
+                  : null;
+        if (arr) arr.forEach(e => entries.push(e));
+      });
+    });
+  });
+  return entries;
+}
+
+// ── Build asset drawing match section ─────────────────────────────────────────
+function buildAssetMatchSection(extractions, topLevel, legendEntries) {
+  // Collect updated_assets from top-level asset_drawing_match or sub_step data
+  let assets = [];
+  let summary = { total: 0, found: 0, not_found: 0 };
+
+  if (topLevel && topLevel.assets && topLevel.assets.length) {
+    assets  = topLevel.assets;
+    summary = { total: topLevel.total || 0, found: topLevel.found || 0, not_found: topLevel.not_found || 0 };
+  } else {
+    extractions.forEach(ex => {
+      const sse = ex.sub_step_extractions || {};
+      Object.values(sse).forEach(v => {
+        const ua = v?.updated_assets || (Array.isArray(v) ? v : null);
+        if (ua && ua.length) {
+          assets = assets.concat(ua.map(r => ({
+            asset_id:           r.asset_id,
+            asset_type:         r.asset_type,
+            description:        r.description,
+            label:              r.label,
+            symbol_description: r.symbol_description,
+            found:              r.match_status === 'found',
+          })));
+        }
+        if (v?.match_summary) {
+          summary = { total: v.match_summary.total || 0, found: v.match_summary.found || 0, not_found: v.match_summary.not_found || 0 };
+        }
+      });
+    });
+  }
+
+  if (!assets.length) return '';
+
+  const foundPct = summary.total ? Math.round((summary.found / summary.total) * 100) : 0;
+
+  // ── Legend reference panel ──────────────────────────────────────────────────
+  const legend = legendEntries || [];
+  const legendHtml = legend.length ? (() => {
+    const uid = 'leg-' + Math.random().toString(36).slice(2,7);
+    const legendRows = legend.map(e => {
+      const lbl  = e.label || e.legend_label || e.name || '—';
+      const desc = e.description || e.symbol_description || e.symbol || '—';
+      const cat  = e.category || e.legend_category || '';
+      return `<tr>
+        <td style="font-weight:600;color:#1e3a5f">${esc(lbl)}</td>
+        <td>${esc(desc)}</td>
+        ${cat ? `<td style="color:#6b7280;font-size:.7rem">${esc(cat)}</td>` : ''}
+      </tr>`;
+    }).join('');
+    const hasCat = legend.some(e => e.category || e.legend_category);
+    return `
+      <details id="${uid}" style="margin-bottom:14px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;">
+        <summary style="padding:8px 14px;background:#f0f9ff;cursor:pointer;font-size:.8rem;font-weight:600;color:#0369a1;list-style:none;display:flex;align-items:center;gap:8px;">
+          🗺 Drawing Legend Reference <span style="font-weight:400;color:#64748b">(${legend.length} symbols)</span>
+        </summary>
+        <div style="padding:12px;overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:.75rem;">
+            <thead><tr style="background:#f8fafc;">
+              <th style="text-align:left;padding:5px 10px;border-bottom:1px solid #e5e7eb;">Label</th>
+              <th style="text-align:left;padding:5px 10px;border-bottom:1px solid #e5e7eb;">Symbol Description</th>
+              ${hasCat ? '<th style="text-align:left;padding:5px 10px;border-bottom:1px solid #e5e7eb;">Category</th>' : ''}
+            </tr></thead>
+            <tbody>${legendRows}</tbody>
+          </table>
+        </div>
+      </details>`;
+  })() : '';
+
+  // ── Asset rows ──────────────────────────────────────────────────────────────
+  const rows = assets.map(r => {
+    const foundCls = r.found ? 'match-found' : 'match-not-found';
+    const foundLbl = r.found ? '✓ Found' : '✗ Not found';
+    const labelVal  = r.label              || '<span style="color:#9ca3af">—</span>';
+    const symbolVal = r.symbol_description || '<span style="color:#9ca3af">—</span>';
+    return `<tr class="${foundCls}">
+      <td><code class="asset-id-code">${esc(r.asset_id||'—')}</code></td>
+      <td>${esc(r.asset_type||'—')}</td>
+      <td style="max-width:260px;white-space:normal">${esc(r.description||'—')}</td>
+      <td style="font-weight:${r.label?'600':'400'}">${r.label ? esc(r.label) : labelVal}</td>
+      <td style="max-width:200px;white-space:normal">${r.symbol_description ? esc(r.symbol_description) : symbolVal}</td>
+      <td><span class="match-badge ${foundCls}">${foundLbl}</span></td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="process-section">
+    <div class="process-hdr" style="background:#1c3a5e">
+      <span class="process-hdr-icon">📍</span>
+      <div class="process-hdr-text">
+        <div class="process-hdr-title">Asset Drawing Match</div>
+        <div class="process-hdr-summary">Site plan chunk review — ${summary.found} of ${summary.total} assets located on drawing</div>
+      </div>
+      <span class="process-hdr-count">${foundPct}% found</span>
+    </div>
+    <div style="background:white;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;padding:16px;overflow-x:auto;">
+      <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+        <span style="background:#dcfce7;color:#166534;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:600;">${summary.found} Found on drawing</span>
+        <span style="background:#fee2e2;color:#991b1b;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:600;">${summary.not_found} Not found</span>
+        <span style="background:#f1f5f9;color:#475569;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:600;">${summary.total} Total assets</span>
+      </div>
+      ${legendHtml}
+      <table class="asset-match-table">
+        <thead><tr>
+          <th>Asset ID</th><th>Type</th><th>Description</th><th>Legend Label</th><th>Symbol Description</th><th>Status</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ── Build full report ─────────────────────────────────────────────────────────
+function buildReport(data) {
+  blockCounter = 0;
+  const dbDocs = [], spDocs = [], legendDocs = [], assetDocs = [], assetMatchDocs = [];
+
+  Object.values(data.source_extractions || {}).forEach(src => {
+    (src.extractions || []).forEach(ex => {
+      const name    = (ex.process_step_name || '').toLowerCase();
+      const docType = (ex.document_type || '').toLowerCase();
+      const sse     = ex.sub_step_extractions || ex.step_extraction || {};
+      // Detect asset symbol match step before generic site plan check
+      const isAssetMatch = docType.includes('asset symbol') ||
+                           (name.includes('match') && name.includes('symbol'));
+      const hasAssets = sse.asset_records || Object.values(sse).some(v => Array.isArray(v) && v[0]?.asset_id);
+      if (isAssetMatch)                                            { assetMatchDocs.push(ex); return; }
+      if (name.includes('legend'))                                 { legendDocs.push(ex); return; }
+      if (hasAssets || docType.includes('spreadsheet'))            { assetDocs.push(ex); return; }
+      if (name.includes('design brief'))                           { dbDocs.push(ex); return; }
+      if (name.includes('site plan'))                              { spDocs.push(ex); return; }
+      // Fallback: key heuristic
+      const keys = Object.keys(sse);
+      if (keys.some(k => k.includes('siteplan'))) spDocs.push(ex);
+      else dbDocs.push(ex);
+    });
+  });
+
+  const totalDocs = dbDocs.length + spDocs.length + legendDocs.length + assetDocs.length;
+
+  // Summary cards
+  const amData  = data.asset_drawing_match;
+  const amFound = amData ? amData.found : assetMatchDocs.length;
+  const stats = `<div class="summary-grid">
+    <div class="stat-card blue"><div class="stat-value">${totalDocs}</div><div class="stat-label">Documents</div></div>
+    <div class="stat-card blue"><div class="stat-value">${dbDocs.length}</div><div class="stat-label">Design Brief</div></div>
+    <div class="stat-card teal"><div class="stat-value">${spDocs.length}</div><div class="stat-label">Site Plan</div></div>
+    ${legendDocs.length   ? `<div class="stat-card violet"><div class="stat-value">${legendDocs.length}</div><div class="stat-label">Drawing</div></div>` : ''}
+    ${assetDocs.length    ? `<div class="stat-card teal"><div class="stat-value">${assetDocs.length}</div><div class="stat-label">Asset Register</div></div>` : ''}
+    ${(assetMatchDocs.length || amData) ? `<div class="stat-card blue"><div class="stat-value">${amFound}</div><div class="stat-label">On Drawing</div></div>` : ''}
+  </div>`;
+
+  const dbSection       = dbDocs.length       ? buildProcessSection(dbDocs, 'db') : '';
+  const spSection       = spDocs.length       ? buildProcessSection(spDocs, 'sp') : '';
+  const legendSection   = legendDocs.length   ? buildLegendSection(legendDocs)    : '';
+  const assetSection    = assetDocs.length    ? buildAssetSection(assetDocs)      : '';
+  const assetMatchSection = (assetMatchDocs.length || amData)
+                            ? buildAssetMatchSection(assetMatchDocs, amData, collectLegendEntries(data)) : '';
+  const docIndex        = buildDocumentIndex(data);
+
+  // Initialise first tab style after render
+  setTimeout(() => {
+    ['db','sp'].forEach(k => {
+      const first = document.querySelector(`#tabs-${k} .doc-tab`);
+      if (first) { const col = k==='db'?'#1d4ed8':'#0f766e'; first.style.color=col; first.style.borderColor=col; first.style.fontWeight='600'; }
+    });
+  }, 0);
+
+  return stats + docIndex + dbSection + spSection + legendSection + assetSection + assetMatchSection;
+}
+
+// ── API calls ─────────────────────────────────────────────────────────────────
+async function init() {
+  const sel = document.getElementById('reportSelect');
+  const btn = document.getElementById('loadBtn');
+
+  // Load process definitions in background
+  loadProcessDefs();
+
+  try {
+    const r = await fetch('/api/orchestrator/output_files');
+    if (!r.ok) throw new Error('Failed to fetch output file list');
+    const d = await r.json();
+    const files = (d.files||[])
+      .filter(f => f.filename.includes('ConsolidatedReport_'))
+      .sort((a,b) => (b.modified_ts||0) - (a.modified_ts||0));
+
+    if (!files.length) { sel.innerHTML = '<option value="">No consolidated reports found</option>'; return; }
+
+    sel.innerHTML = files.map(f => {
+      const basename = f.filename.replace(/\\/g, '/').split('/').pop();
+      const ts = basename.replace('ConsolidatedReport_','').replace('.json','');
+      let label = ts;
+      if (ts.length >= 15) label = `${ts.slice(0,4)}-${ts.slice(4,6)}-${ts.slice(6,8)} ${ts.slice(9,11)}:${ts.slice(11,13)}:${ts.slice(13,15)}`;
+      const kb = f.size_bytes ? ` (${(f.size_bytes/1024).toFixed(0)} KB)` : '';
+      return `<option value="${esc(f.filename)}">${esc(label)}${kb}</option>`;
+    }).join('');
+    btn.disabled = false;
+    // Auto-load newest
+    loadReport();
+  } catch(e) {
+    sel.innerHTML = `<option value="">Error: ${esc(e.message)}</option>`;
+  }
+}
+
+async function loadReport() {
+  const filename = document.getElementById('reportSelect').value;
+  const btn      = document.getElementById('loadBtn');
+  const cont     = document.getElementById('reportContent');
+  const pills    = document.getElementById('metaPills');
+  if (!filename) return;
+
+  btn.disabled = true;
+  cont.innerHTML = '<div class="spinner">Loading report…</div>';
+  pills.style.display = 'none';
+
+  try {
+    // Ensure process defs are loaded
+    if (!Object.values(PROC_DEFS.db.subStepMap).length && !Object.values(PROC_DEFS.sp.subStepMap).length) {
+      await loadProcessDefs();
+    }
+
+    const r = await fetch(`/api/orchestrator/output_file/${encodeURIComponent(filename)}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+
+    pills.innerHTML = `
+      <span class="meta-pill"><b>Generated:</b> ${esc(fmtDate(data.generated_at))}</span>
+      <span class="meta-pill"><b>Extractions:</b> ${Object.keys(data.source_extractions||{}).length}</span>
+      <span class="meta-pill"><b>File:</b> ${esc(filename)}</span>`;
+    pills.style.display = 'flex';
+    cont.innerHTML = buildReport(data);
+  } catch(e) {
+    cont.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><h2>Failed to load report</h2><p>${esc(e.message)}</p></div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+init();
+</script>
+</body>
+</html>
