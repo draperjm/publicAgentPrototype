@@ -1,0 +1,166 @@
+{
+  "registry_version": "1.2",
+  "last_updated": "2026-01-05T12:00:00Z",
+  
+  "agents": [
+    {
+      "id": "agent-finance-01",
+      "name": "Finance Analyst Agent",
+      "type": "specialist",
+      "description": "Specialized in financial data analysis, invoice processing, and budget forecasting.",
+      "capabilities": [
+        "Read and extract data from PDF invoices",
+        "Compare spending against budget thresholds",
+        "Generate CSV reports"
+      ],
+      "meta_data": {
+        "response_time": "slow (10-30s)",
+        "cost_tier": "high (GPT-4)",
+        "reliability": "deterministic"
+      },
+      "endpoint": {
+        "type": "http",
+        "url": "http://finance-agent:8080/process"
+      },
+      "input_schema": {
+        "required": ["file_url", "fiscal_year"]
+      }
+    },
+    {
+      "id": "agent-devops-01",
+      "name": "DevOps Interface Agent",
+      "type": "specialist",
+      "description": "Responsible for interacting with CI/CD pipelines, source control (GitHub/GitLab), and build artifact repositories.",
+      "capabilities": [
+        "Fetch build artifacts",
+        "Read commit history and changelogs",
+        "Check pipeline status"
+      ],
+      "meta_data": {
+        "response_time": "fast (1-5s)",
+        "cost_tier": "low",
+        "reliability": "high"
+      },
+      "endpoint": {
+        "type": "http",
+        "url": "http://devops-agent:8081/execute"
+      },
+      "input_schema": {
+        "required": ["repo_name", "branch"]
+      }
+    },
+    {
+      "id": "agent-compliance-01",
+      "name": "IT Security & Compliance Auditor",
+      "type": "specialist",
+      "description": "Expert in auditing technical data against corporate security policies and regulatory standards.",
+      "capabilities": [
+        "Analyze text for security violations",
+        "Identify banned software libraries",
+        "Reference ISO/SOC2 standards"
+      ],
+      "meta_data": {
+        "response_time": "medium (10s)",
+        "cost_tier": "high",
+        "reliability": "deterministic"
+      },
+      "endpoint": {
+        "type": "http",
+        "url": "http://compliance-agent:8082/audit"
+      },
+      "input_schema": {
+        "required": ["text_content", "policy_id"]
+      }
+    },
+    {
+      "id": "agent-reporter-01",
+      "name": "Documentation & Reporting Specialist",
+      "type": "specialist",
+      "description": "Specializes in summarizing technical findings and formatting them into executive-level documents.",
+      "capabilities": [
+        "Summarize technical JSON into prose",
+        "Generate formatted PDF reports",
+        "Format data tables"
+      ],
+      "meta_data": {
+        "response_time": "slow (20s)",
+        "cost_tier": "medium",
+        "reliability": "high"
+      },
+      "endpoint": {
+        "type": "http",
+        "url": "http://reporter-agent:8083/generate"
+      },
+      "input_schema": {
+        "required": ["data_source", "format"]
+      }
+    }
+  ],
+
+  "tools": [
+    {
+      "id": "tool-currency-converter",
+      "name": "Live Currency Converter",
+      "description": "Converts monetary values between currencies using real-time market rates.",
+      "use_case": "Use this when the user mentions money in different currencies (USD, EUR, etc).",
+      "endpoint": {
+        "type": "function_call",
+        "function_name": "get_exchange_rate"
+      }
+    },
+    {
+      "id": "tool-github-fetch",
+      "name": "GitHub Artifact Retriever",
+      "description": "Connects to the GitHub API to fetch raw commit data, PR details, and build artifacts.",
+      "use_case": "Use when needing to verify what code or files are inside a specific release candidate.",
+      "endpoint": {
+        "type": "function_call",
+        "function_name": "fetch_github_assets"
+      }
+    },
+    {
+      "id": "tool-pdf-generator",
+      "name": "Enterprise Report Generator (PDF)",
+      "description": "Converts structured markdown or JSON data into a branded PDF document.",
+      "use_case": "Use this strictly for the final step of creating a deliverable file.",
+      "endpoint": {
+        "type": "function_call",
+        "function_name": "render_pdf_document"
+      }
+    }
+  ],
+
+  "operations": [
+    {
+      "id": "op-server-reboot",
+      "name": "Safe Server Reboot Protocol",
+      "description": "A strictly defined Standard Operating Procedure (SOP) for restarting production servers.",
+      "trigger_keywords": ["restart", "reboot", "hang", "crash"],
+      "requires_approval": true,
+      "workflow_id": "wf-reboot-prod-05"
+    }
+  ],
+
+  "knowledge": [
+    {
+      "id": "kb-hr-policy-2025",
+      "name": "Global HR Policy Vector Store",
+      "description": "Contains all employee handbooks, leave policies, and expense reimbursement guidelines.",
+      "topics": ["leave", "holiday", "benefits", "harASSMYent", "remote work"],
+      "access_method": {
+        "type": "azure_search",
+        "index_name": "hr-policies-idx"
+      }
+    },
+    {
+      "id": "kb-it-policy-2025",
+      "name": "2025 Corporate Security Standards",
+      "description": "The definitive guide on approved libraries, banned dependencies, and compliance thresholds.",
+      "topics": ["security", "compliance", "banned_libraries", "cve_thresholds", "audit_requirements"],
+      "access_method": {
+        "type": "azure_search",
+        "index_name": "security-policies-2025"
+      }
+    }
+  ]
+}

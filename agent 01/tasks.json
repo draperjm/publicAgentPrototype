@@ -1,0 +1,57 @@
+{
+  "templates": [
+    {
+      "template_id": "tmpl-q4-release-review",
+      "name": "Q4 Release Compliance Review",
+      "description": "Standard procedure for validating the Q4 software release candidate against compliance and security standards.",
+      "triggers": ["review release", "q4 audit", "release validation"],
+      "estimated_duration": "5m",
+      
+      "steps": [
+        {
+          "step_number": 1,
+          "name": "Fetch Release Artifacts",
+          "description": "Retrieve the build manifest and changelog for the latest Q4 candidate.",
+          "required_resources": {
+            "agent_id": "agent-devops-01",
+            "tool_id": "tool-github-fetch",
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Must return a JSON object containing 'build_id' and 'commit_hash'.",
+            "retry_on_failure": true,
+            "max_retries": 3
+          }
+        },
+        {
+          "step_number": 2,
+          "name": "Compliance Scan",
+          "description": "Compare the changelog against the 2025 IT Security Policy to identify banned libraries or patterns.",
+          "required_resources": {
+            "agent_id": "agent-compliance-01",
+            "tool_id": null,
+            "knowledge_id": "kb-it-policy-2025"
+          },
+          "validation": {
+            "criteria": "Must produce a list of 'violations'. If list is empty, return 'status: compliant'.",
+            "critical_fail": true
+          }
+        },
+        {
+          "step_number": 3,
+          "name": "Generate Final Report",
+          "description": "Compile findings into a PDF report for the CTO.",
+          "required_resources": {
+            "agent_id": "agent-reporter-01",
+            "tool_id": "tool-pdf-generator",
+            "knowledge_id": null
+          },
+          "validation": {
+            "criteria": "Output must be a valid file path ending in .pdf",
+            "critical_fail": false
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent Command Center</title>
+    <style>
+        :root { --primary: #2563eb; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 2rem; max-width: 1000px; margin: 0 auto; }
+        
+        /* Layout */
+        .container { display: grid; grid-template-columns: 1fr; gap: 2rem; }
+        
+        /* Cards */
+        .card { background: var(--card); padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        h2 { margin-top: 0; color: var(--primary); font-size: 1.25rem; }
+        
+        /* Input Area */
+        .input-group { display: flex; gap: 10px; margin-bottom: 1rem; }
+        input[type="text"] { flex: 1; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 1rem; }
+        button { background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
+        button:hover { background: #1d4ed8; }
+        button:disabled { background: #94a3b8; cursor: not-allowed; }
+
+        /* Status Panels */
+        .status-box { background: #1e293b; color: #00ff00; font-family: 'Courier New', monospace; padding: 1rem; border-radius: 8px; height: 300px; overflow-y: auto; white-space: pre-wrap; font-size: 0.9rem; }
+        .meta-tag { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; margin-bottom: 1rem; }
+        .tag-ai { background: #dbeafe; color: #1e40af; }
+        .tag-db { background: #dcfce7; color: #166534; }
+
+        /* Step List */
+        .step-list { list-style: none; padding: 0; }
+        .step-item { border-left: 3px solid #cbd5e1; padding-left: 1rem; margin-bottom: 1rem; }
+        .step-item.active { border-left-color: var(--primary); }
+        .step-num { font-weight: bold; color: var(--primary); font-size: 0.8rem; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="card">
+            <h2>🚀 Command Center</h2>
+            <div class="input-group">
+                <input type="text" id="taskInput" placeholder="Enter task (e.g., 'Q4 Release Compliance Review')..." />
+                <button onclick="submitTask()" id="submitBtn">Decompose & Execute</button>
+            </div>
+            <div id="metaInfo"></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+            
+            <div class="card">
+                <h2>📋 Generated Plan</h2>
+                <div id="planContainer">
+                    <p style="color: #64748b; font-style: italic;">Waiting for task...</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>⚙️ Worker Logs (Live)</h2>
+                <div class="status-box" id="consoleOutput">
+[SYSTEM] Ready to receive tasks...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function submitTask() {
+            const input = document.getElementById('taskInput');
+            const btn = document.getElementById('submitBtn');
+            const consoleBox = document.getElementById('consoleOutput');
+            const planBox = document.getElementById('planContainer');
+            const metaBox = document.getElementById('metaInfo');
+
+            if (!input.value.trim()) return;
+
+            // UI Reset
+            btn.disabled = true;
+            btn.innerText = "Processing...";
+            consoleBox.innerText += `\n> Sending task: "${input.value}"...\n`;
+            planBox.innerHTML = '<p style="color: #64748b;">Analysing request...</p>';
+
+            try {
+                // 1. Call Orchestrator (Assuming localhost:8000 is accessible via browser)
+                const response = await fetch('http://localhost:8000/decompose', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task: input.value })
+                });
+
+                if (!response.ok) throw new Error(`Server Error: ${response.status}`);
+
+                const data = await response.json();
+
+                // 2. Display Meta Data (Source)
+                const isAI = data.meta.source === 'ai_generated';
+                metaBox.innerHTML = `<span class="meta-tag ${isAI ? 'tag-ai' : 'tag-db'}">${isAI ? '✨ AI Generated' : '📚 Predefined Template'}</span>`;
+
+                // 3. Render Plan
+                let stepsHtml = `<ul class="step-list">`;
+                data.plan.steps.forEach(step => {
+                    stepsHtml += `
+                        <li class="step-item">
+                            <div class="step-num">Step ${step.step_number}</div>
+                            <strong>${step.name || 'Action'}</strong>
+                            <div style="font-size: 0.9rem; color: #475569;">${step.description}</div>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">👤 ${step.assigned_resource_id || 'General Worker'}</div>
+                        </li>`;
+                });
+                stepsHtml += '</ul>';
+                planBox.innerHTML = `<h3>${data.plan.plan_overview}</h3>${stepsHtml}`;
+
+                // 4. Log Execution Status
+                consoleBox.innerText += `> Plan received.\n> ${data.execution_status}\n`;
+                if (data.execution_status.includes("Handed off")) {
+                    consoleBox.innerText += `> Worker Agent is now processing in background...\n(Check Docker logs for real-time progress)\n`;
+                }
+
+            } catch (err) {
+                consoleBox.innerText += `[ERROR] ${err.message}\n`;
+                planBox.innerHTML = `<p style="color: red;">Failed to get plan.</p>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Decompose & Execute";
+            }
+        }
+    </script>
+</body>
+</html>

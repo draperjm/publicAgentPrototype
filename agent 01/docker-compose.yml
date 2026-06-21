@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # 1. Orchestrator Service
+  orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agent-orchestrator
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - WORKER_URL=http://worker:8001/execute
+    volumes:
+      - .:/app
+    depends_on:
+      - worker
+    networks:
+      - agent-network
+
+  # 2. Worker Service
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: agent-worker
+    ports:
+      - "8001:8001"
+    volumes:
+      - .:/app
+    networks:
+      - agent-network
+
+  # 3. Frontend Service (UPDATED)
+  frontend:
+    build:
+      context: ./frontend           # <--- Look inside the 'frontend' folder
+      dockerfile: Dockerfile.frontend
+    container_name: agent-frontend
+    ports:
+      - "8080:80"
+    networks:
+      - agent-network
+
+networks:
+  agent-network:
+    driver: bridge
