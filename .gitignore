@@ -1,0 +1,40 @@
+.env
+.env.local
+agent 07/azure/.env.production
+agent 07/azure/.env.*
+!agent 07/azure/.env.example
+agent 08/azure/.env.production
+agent 08/azure/.env.*
+!agent 08/azure/.env.example
+agent 09/azure/.env.production
+agent 09/azure/.env.*
+!agent 09/azure/.env.example
+*.pem               # Private keys
+*.log
+*.pdf
+*.xlsx
+
+# Ignore these folders 
+agent 03/Data/
+agent 04/OUTPUT/
+agent 04/Data/
+agent 04/documents/
+agent 05/OUTPUT/
+agent 05/Data/
+agent 05/documents/
+agent 06/documents/
+agent 06/OUTPUT/
+agent 06/Data/
+agent 07/documents/
+agent 07/OUTPUT/
+agent 07/Data/
+data-pipeline/OUTPUT/
+data-pipeline/Data/
+data-pipeline/documents/
+data-pipeline/.env
+agent 08/documents/
+agent 08/OUTPUT/
+agent 08/Data/
+agent 09/documents/
+agent 09/OUTPUT/
+agent 09/Data/
